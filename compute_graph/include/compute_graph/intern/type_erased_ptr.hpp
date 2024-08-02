@@ -15,7 +15,7 @@ public:
     }
 
     template <typename T>
-    auto* as() noexcept {
+    auto* as() {
         using U = std::decay_t<T>;
         if (type_ == typeid(U)) {
             return static_cast<U*>(data_);
@@ -29,7 +29,7 @@ public:
     }
 
     template <typename T>
-    const auto* as() const noexcept {
+    const auto* as() const {
         using U = std::decay_t<T>;
         if (type_ == typeid(U)) {
             return static_cast<const U*>(data_);
@@ -53,10 +53,9 @@ public:
     TypeErasedPtr& operator=(TypeErasedPtr&&) = delete;
     TypeErasedPtr(TypeErasedPtr&&) noexcept = default; // only allow move construct
 
-    template <typename T, typename ... Args>
-    explicit TypeErasedPtr(Args&& ... args, std::function<void (void*)> deleter):
-        data_(new T(std::forward<Args>(args)...)),
-        type_(typeid(T)),
+    explicit TypeErasedPtr(std::type_index type_index, void* data, std::function<void (void*)> deleter):
+        data_(data),
+        type_(type_index),
         deleter_(std::move(deleter)) {}
 
 protected:
@@ -74,7 +73,7 @@ protected:
 template <typename T, typename ... Args>
 TypeErasedPtr make_type_erased_ptr(Args&& ... args) {
     static_assert(std::is_same_v<T, std::decay_t<T>>, "T must be a non-reference type");
-    return TypeErasedPtr<T, Args...>(std::forward<Args>(args)..., [](void* data) {
+    return TypeErasedPtr(typeid(T), new T(std::forward<Args>(args)...), [](void* data) {
         delete static_cast<T*>(data);
     });
 }
@@ -82,7 +81,7 @@ TypeErasedPtr make_type_erased_ptr(Args&& ... args) {
 template <typename T, typename ... Args>
 TypeErasedPtr make_type_erased_ptr(Args&& ... args, std::function<void (void*)> deleter) {
     static_assert(std::is_same_v<T, std::decay_t<T>>, "T must be a non-reference type");
-    return TypeErasedPtr<T, Args...>(std::forward<Args>(args)..., std::move(deleter));
+    return TypeErasedPtr(typeid(T), new T(std::forward<Args>(args)...), std::move(deleter));
 }
 
 CG_NAMESPACE_END
