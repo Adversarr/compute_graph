@@ -64,8 +64,10 @@ public:
   TypeErasedPtr(TypeErasedPtr const &) = delete;
   TypeErasedPtr &operator=(TypeErasedPtr const &) = delete;
   TypeErasedPtr &operator=(TypeErasedPtr &&) = delete;
-  TypeErasedPtr(TypeErasedPtr &&) noexcept =
-      default; // only allow move construct
+  TypeErasedPtr(TypeErasedPtr && another) noexcept:
+    data_(another.data_), type_(another.type_), deleter_(std::move(another.deleter_)) {
+    another.data_ = nullptr;
+  }
 
   explicit TypeErasedPtr(TypeIndex type_index, void *data,
                          std::function<void(void *)> deleter)

@@ -12,7 +12,7 @@ add_executable(compute_graph_exec main.cpp)
 target_link_libraries(compute_graph_exec PUBLIC compute_graph)
 
 if (MSVC)
-    target_compile_options(compute_graph PUBLIC /Zc:preprocessor)
+    target_compile_options(compute_graph INTERFACE /Zc:preprocessor)
 endif()
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
