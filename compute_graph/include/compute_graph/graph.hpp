@@ -5,10 +5,11 @@
 #include <any>
 #include <functional>
 #include <memory>
-#include <typeindex>
 #include <vector>
 
-CG_NAMESPACE_BEGIN
+#include "graph.hpp"
+
+namespace compute_graph {
 
 class InputSocketHandle;
 class OutputSocketHandle;
@@ -37,6 +38,7 @@ private:
 
   const size_t index_;
   NodeBase &node_;
+  friend class Graph;
 };
 
 class InputSocketHandle {
@@ -88,15 +90,13 @@ private:
   size_t const index_;
 };
 
-bool can_connect(OutputSocket const &from, InputSocket const &to);
-
 class Link {
 public:
   OutputSocketHandle from() const noexcept {
-    return OutputSocketHandle(ctx_, from_, from_index_);
+    return {ctx_, from_, from_index_};
   }
   InputSocketHandle to() const noexcept {
-    return InputSocketHandle(ctx_, to_, to_index_);
+    return {ctx_, to_, to_index_};
   }
 
 private:
@@ -117,37 +117,118 @@ public:
   using id_container = std::vector<size_t>;
 
   template <typename T>
-  using typed_map = std::unordered_map<std::type_index, T>;
+  using typed_map = std::unordered_map<utype_ident, T>;
 
   Graph() = default;
   void clear();
   size_t num_nodes() const noexcept { return nodes_.size(); }
   size_t num_links() const noexcept { return link_size_; }
 
-  inline node_container const &nodes() const noexcept { return nodes_; }
-  inline node_container &nodes() noexcept { return nodes_; }
+  node_container const &nodes() const noexcept { return nodes_; }
+  node_container &nodes() noexcept { return nodes_; }
 
   // node op.
   NodeHandle add(std::unique_ptr<NodeBase> node);
-  bool erase(NodeHandle const &handle);
-  inline void clear_nodes() noexcept;
+  void erase(NodeHandle handle);
 
   // socket op
-  Link connect(OutputSocketHandle const &from, InputSocketHandle const &to);
-  Link get(OutputSocketHandle const &from, InputSocketHandle const &to);
-  void erase(Link const &link);
-  void clear_links() noexcept;
+  Link connect(OutputSocketHandle from, InputSocketHandle to);
+  Link get(OutputSocketHandle from, InputSocketHandle to);
+  void erase(Link link);
 
   // context op
   ctx_type &ctx() noexcept { return ctx_; }
 
+  void topology_sort();
+  bool has_cycle() const;
+
 private:
+  size_t fetch_free_id() noexcept;
+  void release_id(size_t id) noexcept;
   node_container nodes_;
   ctx_type ctx_;
   id_container free_ids_;
   size_t uid_next_ = 0;
   size_t link_size_ = 0;
-  // TODO: connection callback.
 };
 
-CG_NAMESPACE_END
+
+inline bool can_connect(OutputSocket const &from, InputSocket const &to) noexcept {
+  return from.type() == to.type();
+}
+
+inline NodeHandle Graph::add(std::unique_ptr<NodeBase> node) {
+  if (free_ids_.empty()) {
+    nodes_.push_back(std::move(node));
+    return {uid_next_++, *nodes_.back()};
+  } else {
+    size_t const index = free_ids_.back();
+    free_ids_.pop_back();
+    nodes_[index] = std::move(node);
+    return {index, *nodes_[index]};
+  }
+}
+
+inline void Graph::erase(NodeHandle handle) {
+  size_t const index = handle.index();
+  for (size_t i = 0; i < handle->inputs().size(); ++i) {
+    auto const &input_sock = handle->inputs()[i];
+    if (input_sock.is_connected()) {
+      auto const& output_sock = *input_sock.from();
+      erase(Link{*this, output_sock.node(), output_sock.index(), handle.node(), i});
+    }
+  }
+
+  for (size_t i = 0; i < handle->outputs().size(); ++i) {
+    auto const &output_sock = handle->outputs()[i];
+    for (auto const &input_sock : output_sock.connected_sockets()) {
+      erase(Link{*this, handle.node(), i, input_sock->node(), input_sock->index()});
+    }
+  }
+
+  // TODO: callback.
+  nodes_[index].reset();
+  free_ids_.push_back(index);
+}
+
+inline Link Graph::connect(OutputSocketHandle from, InputSocketHandle to) {
+  if (!can_connect(*from, *to)) {
+    throw std::invalid_argument("Cannot connect sockets of different types.");
+  }
+
+  // If already connected, erase the old link.
+  if (to->is_connected()) {
+    OutputSocket const* previous_from = to->from();
+    erase(Link{*this, previous_from->node(), previous_from->index(), to->node(), to->index()});
+  }
+
+  // add link in between.
+  auto &from_node = from->node(), &to_node = to->node();
+  from_node.outputs_[from.index()].connect(*to);
+  to_node.inputs_[to.index()].connect(from.operator->());
+  ++link_size_;
+
+  // TODO: callback.
+  return Link{*this, from_node, from.index(), to_node, to.index()};
+}
+
+inline Link Graph::get(OutputSocketHandle from, InputSocketHandle to) {
+  if (to->from() != from.operator->()) {
+    throw std::invalid_argument("Cannot get link between unconnected sockets.");
+  }
+  return Link{*this, from.node(), from.index(), to.node(), to.index()};
+}
+
+inline void Graph::erase(Link link) {
+  auto &from = link.from().node();
+  auto &to = link.to().node();
+  auto &from_sock = from.outputs_[link.from().index()];
+  auto &to_sock = to.inputs_[link.to().index()];
+
+  // TODO: callback.
+  from_sock.erase(to_sock);
+  to_sock.clear();
+  --link_size_;
+}
+
+}

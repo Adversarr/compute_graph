@@ -2,7 +2,7 @@
 #include "config.hpp"
 #include <utility>
 
-CG_NAMESPACE_BEGIN
+namespace compute_graph {
 
 namespace intern {
 template <size_t N, size_t Low, size_t High> struct static_for {
@@ -47,6 +47,64 @@ constexpr size_t count_meta_v = count_meta<T, 0>::count;
 template <typename T>
 constexpr size_t count_socket_v = count_meta_v<T::template socket_meta>;
 
+
+template<typename, typename T>
+struct has_default_value {
+  static_assert(
+    std::integral_constant<T, false>::value,
+    "Second template parameter needs to be of function type.");
+};
+
+template<typename C, typename Ret>
+struct has_default_value<C, Ret()> {
+private:
+  template<typename T>
+  static constexpr auto check(T *)
+    -> typename
+    std::is_same<decltype(T::default_value()), Ret>::type;
+
+  template<typename>
+  static constexpr std::false_type check(...);
+
+  typedef decltype(check<C>(nullptr)) type;
+
+public:
+  static constexpr bool value = type::value;
+};
+
+template<typename C>
+struct has_on_register {
+private:
+  template<typename T>
+  static constexpr auto check(T *)
+    -> typename
+    std::is_same<decltype(T::on_register()), void>::type;
+
+  template<typename>
+  static constexpr std::false_type check(...);
+
+  typedef decltype(check<C>(nullptr)) type;
+
+public:
+  static constexpr bool value = type::value;
+};
+
+template<typename C, bool is_valid_call = has_on_register<C>::value>
+struct call_on_register_if_presented;
+
+template<typename C>
+struct call_on_register_if_presented<C, true> {
+  static void exec() { C::on_register(); }
+};
+
+template<typename C>
+struct call_on_register_if_presented<C, false> {
+  static void exec() {
+  }
+};
+
+template<typename M>
+static constexpr bool has_default_value_v = has_default_value<M, typename M::type const&()>::value;
 } // namespace intern
 
-CG_NAMESPACE_END
+}

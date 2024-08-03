@@ -1,26 +1,5 @@
-//
-// Created by adversarr on 2024/8/2.
-//
-
-
-// example
-// class Node: public NodeBase {
-// public:
-//     CG_NODE_COMMON(Node, "Node Name", "Node desc");
-//
-//     CG_NODE_INPUTS(
-//         CG_SOCKET(float, x, "Input x"),
-//         CG_SOCKET(int, y, "Input y")
-//     );
-//
-//     CG_NODE_OUTPUTS(
-//         CG_SOCKET(float, z, "Output z")
-//     );
-// };
-
+#pragma once
 #include <cstddef>
-
-// need something like boost pp.
 
 #define CG_PP_VAOPT_SIZE(...) CG_PP_VAOPT_SIZE_I(toooo_many, ##__VA_ARGS__, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 #define CG_PP_VAOPT_SIZE_I(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, N, ...) N
@@ -98,33 +77,32 @@
 #define CG_PP_EVAL3(...) CG_PP_EVAL4(CG_PP_EVAL4(CG_PP_EVAL4(__VA_ARGS__)))
 #define CG_PP_EVAL4(...) __VA_ARGS__
 
-#define APPLY_MACRO(type, name, desc, ith) (type, name, desc, ith)
-
-#define CG_PP_EXPAND_FRONT_APPLY(x, i) \
-    CG_PP_EVAL(APPLY_MACRO CG_PP_EMPTY() (i, CG_PP_TUPLE_UNPACK x))
-
 #define CG_PP_FOR_EACH_I(...)          \
     CG_PP_VAOPT_FOR_EACH_I(CG_PP_EXPAND_FRONT_APPLY, __VA_ARGS__)
 
-#define CG_NODE_INPUT_SOCKET_IMPL(Type, Name, desc, ith, ...) \
+#define CG_NODE_INPUT_SOCKET_IMPL(ith, Type, Name, desc, ...) \
   template <> struct socket_meta<ith> {                       \
     using type = Type;                                        \
     static constexpr size_t index = ith;                      \
     static constexpr const char *name = #Name;                \
     static constexpr const char* description = desc;          \
+    __VA_OPT__(                                               \
+      inline static Type const& default_value()  {            \
+      static Type _v {__VA_ARGS__}; return _v;                \
+    } )                                                       \
   };                                                          \
   using Name##_t = socket_meta<ith>;                          \
   static constexpr Name##_t Name{};
 
 #define CG_NODE_PP_ADAPTOR(x, i) \
-    CG_PP_EVAL(CG_NODE_INPUT_SOCKET_IMPL CG_PP_EMPTY() (CG_PP_TUPLE_UNPACK x, i))
+    CG_PP_EVAL(CG_NODE_INPUT_SOCKET_IMPL CG_PP_EMPTY() (i, CG_PP_TUPLE_UNPACK x))
 
-#define CG_NODE_INPUTS(...) \
-    typedef struct intern_input_meta { \
-      template<size_t I> struct socket_meta {\
-        using type = void;\
-      };\
-      __VA_OPT__(CG_PP_VAOPT_FOR_EACH_I(CG_NODE_PP_ADAPTOR, __VA_ARGS__))\
+#define CG_NODE_INPUTS(...)                                               \
+    typedef struct intern_input_meta {                                    \
+      template<size_t I> struct socket_meta {                             \
+        using type = void;                                                \
+      };                                                                  \
+      __VA_OPT__(CG_PP_VAOPT_FOR_EACH_I(CG_NODE_PP_ADAPTOR, __VA_ARGS__)) \
     } in
 
 #define CG_NODE_OUTPUTS(...) \
@@ -135,9 +113,12 @@
       __VA_OPT__(CG_PP_VAOPT_FOR_EACH_I(CG_NODE_PP_ADAPTOR, __VA_ARGS__))\
     } out
 
-#define CG_NODE_COMMON(NodeType, Name, Desc)                                      \
-    NodeType(NodeDescriptor const *descriptor) noexcept : NodeDerive<NodeType>(descriptor) {} \
-    friend class NodeDescriptorBuilder<NodeType>;                                 \
-    static constexpr const char* name = Name;                                     \
-    static constexpr const char* description = Desc;
-
+#define CG_NODE_COMMON(NodeType, Name, Desc)                                   \
+  explicit NodeType(NodeDescriptor const *descriptor) noexcept                 \
+      : NodeDerive<NodeType>(descriptor) {}                                    \
+  friend class NodeDescriptorBuilder<NodeType>;                                \
+  static constexpr const char *name = Name;                                    \
+  static constexpr const char *description = Desc;                             \
+  struct intern_auto_register {                                                \
+    intern_auto_register() { NodeType::register_node(); }                      \
+  }; inline static const intern_auto_register intern_register

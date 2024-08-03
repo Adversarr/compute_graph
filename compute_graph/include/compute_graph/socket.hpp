@@ -1,44 +1,60 @@
 #pragma once
+#include <optional>
+#include <algorithm>
 
 #include "intern/config.hpp"
 #include "intern/type_erased_ptr.hpp"
-#include <optional>
 
-CG_NAMESPACE_BEGIN
+namespace compute_graph {
 
 using Payload = std::optional<TypeErasedPtr>;
 
 class OutputSocket final {
 public:
-  std::type_index type() const noexcept { return type_; }
+  utype_ident type() const noexcept { return type_; }
 
   auto const &connected_sockets() const noexcept { return connected_sockets_; }
 
   template <typename T, typename... Args> T &emplace(Args &&...args) {
-    auto &ptr =
-        payload_.emplace(make_type_erased_ptr<T>(std::forward<Args>(args)...));
-    return *ptr.template as<T>();
+    auto ptr = make_type_erased_ptr<T>(std::forward<Args>(args)...);
+    return *(payload_.emplace(std::move(ptr)).template as<T>());
   }
 
   Payload const &payload() const noexcept { return payload_; }
   Payload &payload() noexcept { return payload_; }
 
+  size_t index() const noexcept { return index_; }
+  NodeBase& node() const noexcept { return node_; }
+  OutputSocket(OutputSocket&& ) = default;
+
 private:
-  explicit OutputSocket(std::type_index type) noexcept : type_(type) {}
-  friend class NodeBase;
-  friend class Graph;
+  OutputSocket(utype_ident type, NodeBase& node, size_t index) noexcept:
+    type_(type), node_(node), index_(index) {}
+
+  void erase(InputSocket const& to) noexcept {
+    connected_sockets_.erase(
+        std::remove_if(connected_sockets_.begin(), connected_sockets_.end(),
+                       [&to](auto const &socket) { return socket == &to; }),
+        connected_sockets_.end());
+  }
+
+
   void connect(InputSocket const &to) noexcept {
     connected_sockets_.push_back(&to);
   }
 
-  const std::type_index type_;
+  friend class NodeBase;
+  friend class Graph;
+  utype_ident const type_;
   std::vector<InputSocket const *> connected_sockets_;
   Payload payload_;
+  NodeBase &node_;
+  size_t const index_;
 };
 
 class InputSocket final {
 public:
-  std::type_index type() const noexcept { return type_; }
+  utype_ident type() const noexcept { return type_; }
 
   Payload const &fetch() const noexcept { return from_->payload(); }
 
@@ -48,14 +64,25 @@ public:
     return !is_connected() || !fetch().has_value();
   }
 
+  OutputSocket const *from() const noexcept { return from_; }
+
+  NodeBase &node() const noexcept { return node_; }
+  size_t index() const noexcept { return index_; }
+
+  InputSocket(InputSocket&& ) = default;
+
 private:
-  friend class NodeBase;
-  friend class Graph;
-  explicit InputSocket(std::type_index type) noexcept : type_(type) {}
+  InputSocket(utype_ident type, NodeBase& node, size_t const index) noexcept:
+    type_(type), from_{nullptr}, node_(node), index_(index) {}
+  void clear() noexcept { from_ = nullptr; }
   void connect(OutputSocket const *from) noexcept { from_ = from; }
 
-  const std::type_index type_;
+  friend class NodeBase;
+  friend class Graph;
+  const utype_ident type_;
   OutputSocket const *from_;
+  NodeBase &node_;
+  size_t const index_;
 };
 
-CG_NAMESPACE_END
+}
