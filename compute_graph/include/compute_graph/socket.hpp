@@ -2,71 +2,60 @@
 
 #include "intern/config.hpp"
 #include "intern/type_erased_ptr.hpp"
+#include <optional>
 
 CG_NAMESPACE_BEGIN
 
-class Pipe {
+using Payload = std::optional<TypeErasedPtr>;
+
+class OutputSocket final {
 public:
-  TypeErasedPtr const &payload() const noexcept { return payload_; }
-
-private:
-  TypeErasedPtr payload_;
-};
-
-enum class SocketType { Input, Output };
-
-class SocketBase {
-public:
-  explicit SocketBase(std::type_index type, SocketType io_type) noexcept
-      : type_(type), io_type_(io_type) {}
-
   std::type_index type() const noexcept { return type_; }
 
-  virtual SocketType io_type() const noexcept { return io_type_; }
+  auto const &connected_sockets() const noexcept { return connected_sockets_; }
 
-  virtual ~SocketBase() noexcept = default;
+  template <typename T, typename... Args> T &emplace(Args &&...args) {
+    auto &ptr =
+        payload_.emplace(make_type_erased_ptr<T>(std::forward<Args>(args)...));
+    return *ptr.template as<T>();
+  }
+
+  Payload const &payload() const noexcept { return payload_; }
+  Payload &payload() noexcept { return payload_; }
 
 private:
+  explicit OutputSocket(std::type_index type) noexcept : type_(type) {}
+  friend class NodeBase;
+  friend class Graph;
+  void connect(InputSocket const &to) noexcept {
+    connected_sockets_.push_back(&to);
+  }
+
   const std::type_index type_;
-  const SocketType io_type_;
+  std::vector<InputSocket const *> connected_sockets_;
+  Payload payload_;
 };
 
-class InputSocket : public SocketBase {
+class InputSocket final {
 public:
-  explicit InputSocket(std::type_index type) noexcept
-      : SocketBase(type, SocketType::Input) {}
+  std::type_index type() const noexcept { return type_; }
 
-  ~InputSocket() noexcept override = default;
+  Payload const &fetch() const noexcept { return from_->payload(); }
 
-  void connect(Pipe *pipe) noexcept { pipe_ = pipe; }
+  bool is_connected() const noexcept { return from_ != nullptr; }
 
-  Pipe *pipe() const noexcept { return pipe_; }
-
-private:
-  Pipe *pipe_;
-};
-
-class OutputSocket : public SocketBase {
-public:
-  explicit OutputSocket(std::type_index type) noexcept
-      : SocketBase(type, SocketType::Output) {}
-  ~OutputSocket() noexcept override = default;
-
-  std::vector<Pipe *> const &connected_pipes() const noexcept {
-    return connected_pipes_;
+  bool is_empty() const noexcept {
+    return !is_connected() || !fetch().has_value();
   }
 
-  template <typename T, typename ... Args>
-  void put(Args &&... args) {
-    payload_.emplace(make_type_erased_ptr<T>(std::forward<Args>(args)...));
-  }
-
-  TypeErasedPtr const &payload() const noexcept { return *payload_; }
-
 private:
-  std::vector<Pipe *> connected_pipes_;
+  friend class NodeBase;
+  friend class Graph;
+  explicit InputSocket(std::type_index type) noexcept : type_(type) {}
+  void connect(OutputSocket const *from) noexcept { from_ = from; }
 
-  std::optional<TypeErasedPtr> payload_;
+  const std::type_index type_;
+  OutputSocket const *from_;
 };
 
 CG_NAMESPACE_END

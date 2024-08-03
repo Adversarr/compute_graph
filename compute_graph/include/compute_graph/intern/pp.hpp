@@ -136,7 +136,8 @@
     } out
 
 #define CG_NODE_COMMON(NodeType, Name, Desc)                                      \
-    NodeType(NodeDescriptor const &descriptor) noexcept : NodeBase(descriptor) {} \
+    NodeType(NodeDescriptor const *descriptor) noexcept : NodeDerive<NodeType>(descriptor) {} \
+    friend class NodeDescriptorBuilder<NodeType>;                                 \
     static constexpr const char* name = Name;                                     \
     static constexpr const char* description = Desc;
 

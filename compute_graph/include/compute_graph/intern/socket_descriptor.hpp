@@ -14,9 +14,9 @@ public:
   SocketDescriptor(SocketDescriptor const &) noexcept = default;
   SocketDescriptor(SocketDescriptor &&) noexcept = default;
 
-  std::type_index type() const noexcept;
-  std::string const &name() const noexcept;
-  std::string const &desc() const noexcept;
+  std::type_index type() const noexcept { return type_; }
+  std::string const &name() const noexcept { return name_; }
+  std::string const &desc() const noexcept { return desc_; }
 
 private:
   const std::type_index type_;
