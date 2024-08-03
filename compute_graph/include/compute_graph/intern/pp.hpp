@@ -101,18 +101,18 @@
 #define CG_PP_FOR_EACH_I(...)          \
     CG_PP_VAOPT_FOR_EACH_I(CG_PP_EXPAND_FRONT_APPLY, __VA_ARGS__)
 
-#define CG_NODE_INPUT_SOCKET_IMPL(ith, Type, Name, desc, ...) \
-  template <> struct socket_meta<ith> {                       \
-    using type = Type;                                        \
-    static constexpr size_t index = ith;                      \
-    static constexpr const char *name = #Name;                \
-    static constexpr const char* description = desc;          \
-    __VA_OPT__(                                               \
-      inline static Type const& default_value()  {            \
-      static Type _v {__VA_ARGS__}; return _v;                \
-    } )                                                       \
-  };                                                          \
-  using Name##_t = socket_meta<ith>;                          \
+#define CG_NODE_INPUT_SOCKET_IMPL(ith, Type, Name, desc, ...)         \
+  template <typename _WHATEVER> struct socket_meta<ith, _WHATEVER> {  \
+    using type = Type;                                                \
+    static constexpr size_t index = ith;                              \
+    static constexpr const char *name = #Name;                        \
+    static constexpr const char* description = desc;                  \
+    __VA_OPT__(                                                       \
+      inline static Type const& default_value()  {                    \
+      static Type _v {__VA_ARGS__}; return _v;                        \
+    } )                                                               \
+  };                                                                  \
+  using Name##_t = socket_meta<ith, int>;                             \
   static constexpr Name##_t Name{};
 
 #define CG_NODE_PP_ADAPTOR(x, i) \
@@ -120,7 +120,7 @@
 
 #define CG_NODE_INPUTS(...)                                               \
     typedef struct intern_input_meta {                                    \
-      template<size_t I> struct socket_meta {                             \
+      template<size_t I, typename=int> struct socket_meta {               \
         using type = void;                                                \
       };                                                                  \
       __VA_OPT__(CG_PP_VAOPT_FOR_EACH_I(CG_NODE_PP_ADAPTOR, __VA_ARGS__)) \
@@ -128,10 +128,10 @@
 
 #define CG_NODE_OUTPUTS(...) \
     typedef struct intern_output_meta { \
-      template<size_t I> struct socket_meta {\
-        using type = void;\
-      };\
-      __VA_OPT__(CG_PP_VAOPT_FOR_EACH_I(CG_NODE_PP_ADAPTOR, __VA_ARGS__))\
+      template<size_t I, typename = int> struct socket_meta {             \
+        using type = void;                                                \
+      };                                                                  \
+      __VA_OPT__(CG_PP_VAOPT_FOR_EACH_I(CG_NODE_PP_ADAPTOR, __VA_ARGS__)) \
     } out
 
 #define CG_NODE_COMMON(NodeType, Name, Desc)                                   \
