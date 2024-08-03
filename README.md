@@ -2,6 +2,13 @@
 
 A tiny c++ library for computational graph.
 
+## Tested Compiler
+
+Basic requirement is C++17 support.
+
+- gcc 14
+- clang 17
+
 ## Demonstration
 
 ```cpp

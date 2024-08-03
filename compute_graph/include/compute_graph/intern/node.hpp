@@ -49,20 +49,20 @@ template <typename T> struct is_meta_valid {
   static constexpr bool value = !std::is_same_v<typename T::type, void>;
 };
 
-template <template <size_t> typename T, size_t current,
-          bool valid = is_meta_valid<T<current>>::value>
+template <template <size_t, typename> typename T, size_t current,
+          bool valid = is_meta_valid<T<current, int>>::value>
 struct count_meta;
 
-template <template <size_t> typename T, size_t current>
+template <template <size_t, typename> typename T, size_t current>
 struct count_meta<T, current, true> {
   static constexpr size_t count = 1 + count_meta<T, current + 1>::count;
 };
-template <template <size_t> typename T, size_t current>
+template <template <size_t, typename> typename T, size_t current>
 struct count_meta<T, current, false> {
   static constexpr size_t count = 0;
 };
 
-template <template <size_t> typename T>
+template <template <size_t, typename> typename T>
 constexpr size_t count_meta_v = count_meta<T, 0>::count;
 
 template <typename T>
