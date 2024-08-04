@@ -114,17 +114,19 @@ CG_STRONG_INLINE NodeDescriptor const &register_node(NodeDescriptor const &descr
       .first->second;
 }
 
-CG_STRONG_INLINE std::unique_ptr<NodeBase> create_node(utype_ident node_type) {
+CG_STRONG_INLINE std::unique_ptr<NodeBase> create_node(utype_ident node_type) CG_NOEXCEPT {
   const auto &descriptors = node_descriptors();
   auto const it = descriptors.find(node_type);
+#ifndef CG_NO_CHECK
   if (it == descriptors.end()) {
-    throw std::invalid_argument("Invalid node type: " + to_string(node_type));
+    CG_THROW(std::invalid_argument, "Invalid node type: " + to_string(node_type));
   }
+#endif
   return it->second.build();
 }
 
 template <typename T>
-CG_STRONG_INLINE std::unique_ptr<NodeBase> create_node() {
+CG_STRONG_INLINE std::unique_ptr<NodeBase> create_node() CG_NOEXCEPT {
   return create_node(typeid(T));
 }
 

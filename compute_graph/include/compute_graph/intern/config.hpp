@@ -33,7 +33,16 @@
 //   |  class. This is useful for adding extra methods or members to the      |
 //   |  node class.                                                           |
 //   +------------------------------------------------------------------------+
-
+//   CG_NO_EXCEPTION:---------------------------------------------------------+
+//   |  Controls whether to use exceptions or not.                            |
+//   |  Define this macro to disable exceptions, and check failures will      |
+//   |  fallback to abort().                                                  |
+//   +------------------------------------------------------------------------+
+//   CG_NO_CHECK:-------------------------------------------------------------+
+//   |  Controls whether to use runtime checks or not.                        |
+//   |  Define this macro to disable runtime checks, and check failures will  |
+//   |  fallback to undefined behavior.                                       |
+//   +------------------------------------------------------------------------+
 
 #pragma once
 
@@ -58,6 +67,19 @@
 
 #ifndef CG_NODE_EXTENSION
 #define CG_NODE_EXTENSION /* empty */
+#endif
+
+#ifdef CG_NO_CHECK
+#define CG_THROW(type, ...) /* empty */
+#define CG_NOEXCEPT noexcept
+#else
+#ifdef CG_NO_EXCEPTION
+#define CG_THROW(type, ...) abort()
+#define CG_NOEXCEPT noexcept
+#else
+#define CG_THROW(type, ...) throw type(__VA_ARGS__)
+#define CG_NOEXCEPT
+#endif
 #endif
 
 namespace compute_graph {

@@ -255,9 +255,10 @@ CG_STRONG_INLINE void Graph::erase(NodeHandle handle) {
   free_ids_.push_back(index);
 }
 
-CG_STRONG_INLINE Link Graph::connect(OutputSocketHandle from, InputSocketHandle to) {
+CG_STRONG_INLINE Link Graph::connect(OutputSocketHandle from, InputSocketHandle to) CG_NOEXCEPT {
   if (!can_connect(*from, *to)) {
-    throw std::invalid_argument("Cannot connect sockets of different types." + to_string(from->type()) + " and " + to_string(to->type()));
+    CG_THROW(std::invalid_argument,
+      "Cannot connect sockets of different types." + to_string(from->type()) + " and " + to_string(to->type()));
   }
 
   // If already connected, erase the old link.

@@ -33,24 +33,32 @@ class TypeErasedPtr {
 public:
   CG_STRONG_INLINE void *get() noexcept { return data_; }
 
-  template <typename T> CG_STRONG_INLINE auto *as() {
+  template <typename T> CG_STRONG_INLINE auto *as() CG_NOEXCEPT  {
     using U = std::decay_t<T>;
+#ifdef CG_NO_CHECK
+    return static_cast<U *>(data_);
+#else
     if (type_ == typeid(U)) {
       return static_cast<U *>(data_);
     } else {
-      throw bad_type_erased_cast();
+      CG_THROW(bad_type_erased_cast);
     }
+#endif
   }
 
   CG_STRONG_INLINE const void *get() const noexcept { return data_; }
 
-  template <typename T> CG_STRONG_INLINE const auto *as() const {
+  template <typename T> CG_STRONG_INLINE const auto *as() const CG_NOEXCEPT  {
     using U = std::decay_t<T>;
+#ifdef CG_NO_CHECK
+    return static_cast<const U *>(data_);
+#else
     if (type_ == typeid(U)) {
       return static_cast<const U *>(data_);
     } else {
-      throw bad_type_erased_cast();
+      CG_THROW(bad_type_erased_cast);
     }
+#endif
   }
 
   CG_STRONG_INLINE TypeIndex type() const noexcept { return type_; }
@@ -64,8 +72,9 @@ public:
   CG_STRONG_INLINE TypeErasedPtr(TypeErasedPtr const &) = delete;
   CG_STRONG_INLINE TypeErasedPtr &operator=(TypeErasedPtr const &) = delete;
   CG_STRONG_INLINE TypeErasedPtr &operator=(TypeErasedPtr &&) = delete;
-  CG_STRONG_INLINE TypeErasedPtr(TypeErasedPtr && another) noexcept:
-    data_(another.data_), type_(another.type_), deleter_(std::move(another.deleter_)) {
+  CG_STRONG_INLINE TypeErasedPtr(TypeErasedPtr &&another) noexcept
+      : data_(another.data_), type_(another.type_),
+        deleter_(std::move(another.deleter_)) {
     another.data_ = nullptr;
   }
 
@@ -82,8 +91,7 @@ protected:
 template <typename T, typename... Args,
           typename = std::enable_if_t<std::is_default_constructible_v<T>>>
 CG_STRONG_INLINE TypeErasedPtr make_type_erased_ptr(Args &&...args) {
-  static_assert(std::is_same_v<T, std::decay_t<T>>,
-                "T must be a decayed type");
+  static_assert(std::is_same_v<T, std::decay_t<T>>, "T must be a decayed type");
   return TypeErasedPtr(typeid(T), new T(std::forward<Args>(args)...),
                        [](void *data) { delete static_cast<T *>(data); });
 }
