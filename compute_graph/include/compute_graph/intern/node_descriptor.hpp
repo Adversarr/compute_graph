@@ -30,11 +30,8 @@
 #include "socket_descriptor.hpp"
 
 namespace compute_graph {
-using NodeRegistry = std::unordered_map<utype_ident, NodeDescriptor>;
-using NodeFactory = std::function<std::unique_ptr<NodeBase>(NodeDescriptor const *)>;
 
-NodeRegistry &node_descriptors();
-NodeDescriptor const &register_node(NodeDescriptor const &descriptor);
+using NodeFactory = std::function<std::unique_ptr<NodeBase>(NodeDescriptor const *)>;
 
 class NodeDescriptor {
 public:
@@ -50,12 +47,28 @@ public:
 
   CG_STRONG_INLINE utype_ident const &type() const noexcept { return type_; }
 
-  CG_STRONG_INLINE NodeDescriptor(NodeDescriptor const &) = default;
+  CG_STRONG_INLINE std::optional<size_t> find_input(std::string const &name) const noexcept {
+    for (size_t i = 0; i < inputs_.size(); ++i) {
+      if (inputs_[i].name() == name) {
+        return i;
+      }
+    }
+    return std::nullopt;
+  }
 
+  CG_STRONG_INLINE std::optional<size_t> find_output(std::string const &name) const noexcept {
+    for (size_t i = 0; i < outputs_.size(); ++i) {
+      if (outputs_[i].name() == name) {
+        return i;
+      }
+    }
+    return std::nullopt;
+  }
+
+  CG_STRONG_INLINE NodeDescriptor(NodeDescriptor const &) = default;
   CG_STRONG_INLINE NodeDescriptor(NodeDescriptor &&) = default;
 
   CG_STRONG_INLINE std::unique_ptr<NodeBase> build() const { return factory_(this); }
-
   template <typename NodeType> friend class NodeDescriptorBuilder;
 
 private:
@@ -96,36 +109,57 @@ public:
     return *this;
   }
 
-  CG_STRONG_INLINE NodeDescriptor const &build() const noexcept {
-    return register_node(descriptor_);
-  }
+  CG_STRONG_INLINE NodeDescriptor build() const noexcept { return descriptor_; }
 
 private:
   NodeDescriptor descriptor_;
 };
 
-inline NodeRegistry &node_descriptors() {
-  static NodeRegistry descriptors;
-  return descriptors;
-}
+class NodeRegistry {
+public:
+  using container_type = std::unordered_map<utype_ident, NodeDescriptor>;
 
-CG_STRONG_INLINE NodeDescriptor const &register_node(NodeDescriptor const &descriptor) {
-  return node_descriptors().emplace(descriptor.type(), descriptor).first->second;
-}
+  CG_STRONG_INLINE auto find(utype_ident type) const noexcept { return descriptors_.find(type); }
+  CG_STRONG_INLINE auto begin() const noexcept { return descriptors_.begin(); }
+  CG_STRONG_INLINE auto end() const noexcept { return descriptors_.end(); }
 
-CG_STRONG_INLINE std::unique_ptr<NodeBase> create_node(utype_ident node_type) CG_NOEXCEPT {
-  const auto &descriptors = node_descriptors();
-  auto const it = descriptors.find(node_type);
-#ifndef CG_NO_CHECK
-  if (it == descriptors.end()) {
-    CG_THROW(std::invalid_argument, "Invalid node type: " + to_string(node_type));
+  CG_STRONG_INLINE NodeDescriptor const &emplace(NodeDescriptor const& descriptor) {
+    return descriptors_.emplace(descriptor.type(), descriptor).first->second;
   }
-#endif
-  return it->second.build();
-}
 
-template <typename T> CG_STRONG_INLINE std::unique_ptr<NodeBase> create_node() CG_NOEXCEPT {
-  return create_node(typeid(T));
-}
+  std::unique_ptr<NodeBase> create(utype_ident type) const CG_NOEXCEPT {
+    auto const it = descriptors_.find(type);
+#ifndef CG_NO_CHECK
+    if (it == descriptors_.end()) {
+      CG_THROW(std::invalid_argument, "Invalid node type: " + to_string(type));
+    }
+#endif
+    return it->second.build();
+  }
+
+  template <typename T> std::unique_ptr<NodeBase> create() const CG_NOEXCEPT {
+    return create(typeid(T));
+  }
+
+  CG_STRONG_INLINE bool has(utype_ident type) const noexcept {
+    return descriptors_.find(type) != descriptors_.end();
+  }
+
+  CG_STRONG_INLINE void clear() noexcept { descriptors_.clear(); }
+
+  static NodeRegistry &instance() {
+    static NodeRegistry registry;
+    return registry;
+  }
+
+  CG_STRONG_INLINE NodeRegistry(): descriptors_{} {}
+  NodeRegistry(NodeRegistry const &) = delete;
+  NodeRegistry(NodeRegistry &&) = default;
+  NodeRegistry &operator=(NodeRegistry const &) = delete;
+  NodeRegistry &operator=(NodeRegistry &&) = default;
+
+private:
+  container_type descriptors_;
+};
 
 }  // namespace compute_graph

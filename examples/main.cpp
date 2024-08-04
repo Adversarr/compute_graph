@@ -10,13 +10,15 @@ public:
   CG_NODE_INPUTS();
   CG_NODE_OUTPUTS((int, value, "The constant integer value"));
 
+  void on_construct() /* optional */ { set(out::value, 5); }
+
   void operator()(Graph &) final { set(out::value, 5); }
 };
 
 class WhateverNode : public NodeDerive<WhateverNode> {
 public:
   CG_NODE_COMMON(WhateverNode, "Whatever", "WhateverDescription");
-  CG_NODE_INPUTS((int, x, "Describe x", 0 /* default value = 0 */),
+  CG_NODE_INPUTS((int, x, "Describe x", 0 /* default value = 0  */),
                  (int, y, "Describe y", 42 /* default value = 42 */));
   CG_NODE_OUTPUTS((std::string, z, "z equals x + y"));
 
@@ -37,6 +39,11 @@ public:
   CG_NODE_INPUTS((std::string, str, "Input string"));
   CG_NODE_OUTPUTS();
 
+  void on_connect(in::str_) /* automatically called. */ {
+    std::cout << "EchoString::on_connect" << std::endl;
+    std::cout << " has input set? " << std::boolalpha << has(in::str) << std::endl;
+  }
+
   void operator()(Graph &) final {
     auto str = *get(in::str);
     std::cout << "str: " << std::quoted(str) << std::endl;
@@ -45,15 +52,12 @@ public:
 
 int main() {
   Graph g;
-  auto nh1 = g.add(create_node<WhateverNode>()),
-       nh2 = g.add(create_node<EchoString>()),
-       nh3 = g.add(create_node<ConstIntegerNode>());
+  auto nh1 = g.add(NodeRegistry::instance().create<WhateverNode>()),
+       nh2 = g.add(NodeRegistry::instance().create<EchoString>()),
+       nh3 = g.add(NodeRegistry::instance().create<ConstIntegerNode>());
   g.connect(nh1.output(WhateverNode::out::z), nh2.input(EchoString::in::str));
   g.connect(nh3.output(ConstIntegerNode::out::value), nh1.input(WhateverNode::in::x));
   g.topology_sort();
-
-  std::cout << nh3.node().input_index("value").value_or(-1) << std::endl;
-  std::cout << nh3.node().output_index("value").value_or(-1) << std::endl;
 
   for (auto const &node : g.nodes()) {
     (*node)(g);

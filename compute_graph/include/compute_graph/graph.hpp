@@ -245,7 +245,6 @@ CG_STRONG_INLINE void Graph::erase(NodeHandle handle) {
     }
   }
 
-  // TODO: callback.
   addr_to_index_.erase(nodes_[index].get());
   nodes_[index].reset();
   free_ids_.push_back(index);
@@ -270,7 +269,7 @@ CG_STRONG_INLINE Link Graph::connect(OutputSocketHandle from, InputSocketHandle 
   to_node.inputs_[to.index()].connect(from.operator->());
   ++link_size_;
 
-  // TODO: callback.
+  to->node().on_connect(to.index());
   return Link{from_node, from.index(), to_node, to.index()};
 }
 

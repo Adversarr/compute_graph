@@ -32,20 +32,18 @@ using Payload = std::optional<TypeErasedPtr>;
 
 class OutputSocket {
 public:
-  utype_ident type() const noexcept { return type_; }
-
-  auto const &connected_sockets() const noexcept { return connected_sockets_; }
-
   template <typename T, typename... Args> T &emplace(Args &&...args) {
     auto ptr = make_type_erased_ptr<T>(std::forward<Args>(args)...);
     return *(payload_.emplace(std::move(ptr)).template as<T>());
   }
 
-  CG_STRONG_INLINE Payload const &payload() const noexcept { return payload_; }
-  CG_STRONG_INLINE Payload &payload() noexcept { return payload_; }
+  CG_STRONG_INLINE utype_ident const &type() const noexcept { return type_; }
+  CG_STRONG_INLINE auto const &connected_sockets() const noexcept { return connected_sockets_; }
 
+  CG_STRONG_INLINE Payload const &payload() const noexcept { return payload_; }
   CG_STRONG_INLINE size_t index() const noexcept { return index_; }
   CG_STRONG_INLINE NodeBase &node() const noexcept { return node_; }
+  CG_STRONG_INLINE void clear() noexcept { payload_.reset(); }
 
   CG_STRONG_INLINE OutputSocket(OutputSocket const &) = delete;
   CG_STRONG_INLINE OutputSocket(OutputSocket &&) noexcept = default;
@@ -62,6 +60,7 @@ private:
                              connected_sockets_.end());
   }
 
+  CG_STRONG_INLINE Payload &payload() noexcept { return payload_; }
   CG_STRONG_INLINE void connect(InputSocket const &to) noexcept {
     connected_sockets_.push_back(&to);
   }
@@ -77,12 +76,10 @@ private:
 
 class InputSocket {
 public:
-  CG_STRONG_INLINE utype_ident type() const noexcept { return type_; }
-
+  CG_STRONG_INLINE utype_ident const &type() const noexcept { return type_; }
   CG_STRONG_INLINE Payload const &fetch() const noexcept { return from_->payload(); }
 
   CG_STRONG_INLINE bool is_connected() const noexcept { return from_ != nullptr; }
-
   CG_STRONG_INLINE bool is_empty() const noexcept {
     return !is_connected() || !fetch().has_value();
   }
@@ -91,8 +88,8 @@ public:
   CG_STRONG_INLINE NodeBase &node() const noexcept { return node_; }
   CG_STRONG_INLINE size_t index() const noexcept { return index_; }
 
-  CG_STRONG_INLINE InputSocket(InputSocket &&) noexcept = default;
   CG_STRONG_INLINE InputSocket(InputSocket const &) = delete;
+  CG_STRONG_INLINE InputSocket(InputSocket &&) noexcept = default;
   CG_STRONG_INLINE InputSocket &operator=(InputSocket const &) = delete;
   CG_STRONG_INLINE InputSocket &operator=(InputSocket &&) = delete;
 

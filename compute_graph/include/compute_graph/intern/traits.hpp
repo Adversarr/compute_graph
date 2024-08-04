@@ -143,5 +143,42 @@ struct socket_meta_base {};
 template <typename T> using is_socket_meta = std::is_base_of<socket_meta_base, T>;
 
 template <typename T> constexpr bool is_socket_meta_v = is_socket_meta<T>::value;
+
+template <typename C, typename MT> struct has_on_connect_mt {
+private:
+  template <typename T> static constexpr auto check(T *) ->
+      typename std::is_same<decltype(std::declval<T>().on_connect(std::declval<MT>())), void>::type;
+
+  template <typename> static constexpr std::false_type check(...);
+
+  typedef decltype(check<C>(nullptr)) type;
+
+public:
+  static constexpr bool value = type::value;
+};
+
+template <typename C, typename MT> static constexpr bool has_on_connect_mt_v
+    = has_on_connect_mt<C, MT>::value;
+
+template <typename C, typename MT, bool = has_on_connect_mt_v<C, MT>> struct call_on_connect_mt_if_presented;
+
+template <typename C, typename MT> struct call_on_connect_mt_if_presented<C, MT, true> {
+  static CG_STRONG_INLINE void exec(C &c, MT m) { c.on_connect(m); }
+};
+
+template <typename C, typename MT> struct call_on_connect_mt_if_presented<C, MT, false> {
+  static CG_STRONG_INLINE void exec(C &, MT) {}
+};
+
 }  // namespace intern
+
+template <typename MT> struct is_socket_meta : intern::is_socket_meta<MT> {};
+template <typename MT> constexpr bool is_socket_meta_v = intern::is_socket_meta_v<MT>;
+template <typename MT> struct has_default_value : intern::has_default_value<MT, typename MT::type> {};
+template <typename MT> constexpr bool has_default_value_v = intern::has_default_value_v<MT>;
+template <typename MT> struct has_on_register : intern::has_on_register<MT> {};
+template <typename MT> constexpr bool has_on_register_v = intern::has_on_register_v<MT>;
+template <typename MT> struct has_on_construct : intern::has_on_construct<MT> {};
+template <typename MT> constexpr bool has_on_construct_v = intern::has_on_construct_v<MT>;
+
 }  // namespace compute_graph

@@ -22,9 +22,9 @@
 #pragma once
 #include <vector>
 
-#include "intern/node.hpp"
 #include "intern/node_descriptor.hpp"
 #include "intern/pp.hpp"
+#include "intern/traits.hpp"
 #include "socket.hpp"
 
 namespace compute_graph {
@@ -60,27 +60,19 @@ public:
   CG_STRONG_INLINE auto const &inputs() const noexcept { return inputs_; }
   CG_STRONG_INLINE auto const &outputs() const noexcept { return outputs_; }
 
-  virtual std::optional<size_t> input_index(std::string const &name) const noexcept {
-    for (size_t i = 0; i < descriptor_->inputs().size(); ++i) {
-      if (descriptor_->inputs()[i].name() == name) {
-        return i;
-      }
-    }
-    return std::nullopt;
+  std::optional<size_t> find_input(std::string const &name) const noexcept {
+    return descriptor_->find_input(name);
   }
 
-  virtual std::optional<size_t> output_index(std::string const &name) const noexcept {
-    for (size_t i = 0; i < descriptor_->outputs().size(); ++i) {
-      if (descriptor_->outputs()[i].name() == name) {
-        return i;
-      }
-    }
-    return std::nullopt;
+  std::optional<size_t> find_output(std::string const &name) const noexcept {
+    return descriptor_->find_output(name);
   }
 
   CG_NODE_EXTENSION
 
 protected:
+  virtual void on_connect(size_t /*index*/) noexcept {}
+
   CG_STRONG_INLINE TypeErasedPtr const &get_input(size_t index) const {
     return (inputs_[index].fetch()).value();
   }
@@ -105,13 +97,11 @@ private:
 template <typename Derived> class NodeDerive : public NodeBase {
 public:
   CG_STRONG_INLINE explicit NodeDerive(NodeDescriptor const *descriptor) noexcept
-      : NodeBase(descriptor) {
-    intern::call_on_construct_if_presented<Derived>::exec(static_cast<Derived &>(*this));
-  }
+      : NodeBase(descriptor) {}
 
   virtual ~NodeDerive() noexcept = default;
 
-  struct intern_node_register {
+  struct intern_node_traits {
     static constexpr const char *name = Derived::name;
     static constexpr const char *description = Derived::description;
     using input_metas = typename Derived::intern_input_meta;
@@ -132,53 +122,35 @@ public:
       }
     };
 
-    template <size_t I> struct input_name_test_fn {
-      static CG_STRONG_INLINE void eval(std::string const &value, size_t &out) {
-        if (value == input_metas::template socket_meta<I>::name) {
-          out = I;
-        }
-      }
-    };
-
-    template <size_t I> struct output_name_test_fn {
-      static CG_STRONG_INLINE void eval(std::string const &value, size_t &out) {
-        if (value == output_metas::template socket_meta<I>::name) {
-          out = I;
+    template <size_t i> struct input_on_connect_fn {
+      static CG_STRONG_INLINE void eval(size_t index, Derived &node) {
+        using meta = typename input_metas::template socket_meta<i>;
+        if (index == i) {
+          intern::call_on_connect_mt_if_presented<Derived, meta>::exec(node, meta{});
         }
       }
     };
   };
 
-  static CG_STRONG_INLINE const auto &register_node() {
-    NodeDescriptorBuilder<Derived> builder(intern_node_register::name,
-                                           intern_node_register::description);
-    intern::static_for_eval<0, intern::count_socket_v<typename intern_node_register::input_metas>,
-                            intern_node_register::template input_reg_fn>(builder);
-    intern::static_for_eval<0, intern::count_socket_v<typename intern_node_register::output_metas>,
-                            intern_node_register::template output_reg_fn>(builder);
+  static CG_STRONG_INLINE NodeDescriptor build_descriptor() {
+    NodeDescriptorBuilder<Derived> builder(intern_node_traits::name,
+                                           intern_node_traits::description);
+    intern::static_for_eval<0, intern::count_socket_v<typename intern_node_traits::input_metas>,
+                            intern_node_traits::template input_reg_fn>(builder);
+    intern::static_for_eval<0, intern::count_socket_v<typename intern_node_traits::output_metas>,
+                            intern_node_traits::template output_reg_fn>(builder);
 
     intern::call_on_register_if_presented<Derived>::exec();
     return builder.build();
   }
 
-  std::optional<size_t> input_index(std::string const &name) const noexcept final {
-    constexpr size_t max_index = intern::count_socket_v<typename intern_node_register::input_metas>;
-    size_t index = intern::count_socket_v<typename intern_node_register::input_metas>;
-    intern::static_for_eval<0, max_index, intern_node_register::template input_name_test_fn>(name,
-                                                                                             index);
-    return index == max_index ? std::nullopt : std::make_optional(index);
-  }
-
-  std::optional<size_t> output_index(std::string const &name) const noexcept final {
-    constexpr size_t max_index
-        = intern::count_socket_v<typename intern_node_register::output_metas>;
-    size_t index = max_index;
-    intern::static_for_eval<0, max_index, intern_node_register::template output_name_test_fn>(
-        name, index);
-    return index == max_index ? std::nullopt : std::make_optional(index);
-  }
-
 protected:
+  void on_connect(size_t index) noexcept override {
+    constexpr size_t total = intern::count_socket_v<typename intern_node_traits::input_metas>;
+    intern::static_for_eval<0, total, intern_node_traits::template input_on_connect_fn>(
+        index, *static_cast<Derived *>(this));
+  }
+
   template <typename MT, typename = std::enable_if_t<intern::is_socket_meta_v<MT>>>
   CG_STRONG_INLINE auto const *get(MT) const {
     constexpr size_t index = MT::index;
@@ -187,7 +159,6 @@ protected:
 
   template <typename MT, typename = std::enable_if_t<intern::is_socket_meta_v<MT>>>
   CG_STRONG_INLINE auto const &get_or(MT) const {
-    static_assert(intern::has_default_value_v<MT>, "No default value.");
     constexpr size_t index = MT::index;
     return has_input(index) ? *get<MT>({}) : default_value<MT>({});
   }
@@ -202,7 +173,25 @@ protected:
 
   template <typename MT, typename = std::enable_if_t<intern::is_socket_meta_v<MT>>>
   static CG_STRONG_INLINE auto const &default_value(MT) noexcept {
+    static_assert(intern::has_default_value_v<MT>, "No default value.");
     return MT::default_value();
+  }
+
+  template <typename MT, typename = std::enable_if_t<intern::is_socket_meta_v<MT>>>
+  CG_STRONG_INLINE bool has(MT) const noexcept {
+    constexpr size_t index = MT::index;
+    return has_input(index);
+  }
+
+  CG_STRONG_INLINE TypeErasedPtr const &get(size_t index) const { return get_input(index); }
+
+  template <typename T, typename... Args> CG_STRONG_INLINE auto &set(size_t index, Args &&...args) {
+    return set_output<T>(index, std::forward<Args>(args)...);
+  }
+
+  template <size_t i> static CG_STRONG_INLINE auto const &default_value() noexcept {
+    using MT = typename intern_node_traits::input_metas::template socket_meta<i>;
+    return default_value<MT>({});
   }
 };
 
@@ -221,8 +210,8 @@ protected:
       return _v;                                                     \
     })                                                               \
   };                                                                 \
-  using Name##_t = socket_meta<ith, int>;                            \
-  static constexpr Name##_t Name{};
+  using Name##_ = socket_meta<ith, int>;                             \
+  static constexpr Name##_ Name{};
 
 #define CG_NODE_PP_ADAPTOR(x, i) \
   CG_PP_EVAL(CG_NODE_SOCKET_IMPL CG_PP_EMPTY()(i, CG_PP_TUPLE_UNPACK x))
@@ -260,18 +249,28 @@ protected:
 #ifdef CG_NO_AUTO_REGISTER
 #  define CG_NODE_REGISTER_BODY(NodeType) /* empty */
 #else
-#  define CG_NODE_REGISTER_BODY(NodeType)                                    \
-    struct intern_auto_register {                                            \
-      CG_STRONG_INLINE intern_auto_register() { NodeType::register_node(); } \
-    };                                                                       \
+#  define CG_NODE_REGISTER_BODY(NodeType)                    \
+    struct intern_auto_register {                            \
+      CG_STRONG_INLINE intern_auto_register() {              \
+        auto &r = ::compute_graph::NodeRegistry::instance(); \
+        r.emplace(NodeType::build_descriptor());             \
+      }                                                      \
+    };                                                       \
     inline static const intern_auto_register intern_register
 #endif
 
 // Use to define a node.
-#define CG_NODE_COMMON(NodeType, Name, Desc)                                    \
-  CG_STRONG_INLINE explicit NodeType(NodeDescriptor const *descriptor) noexcept \
-      : NodeDerive<NodeType>(descriptor) {}                                     \
-  friend class NodeDescriptorBuilder<NodeType>;                                 \
-  static constexpr const char *name = Name;                                     \
-  static constexpr const char *description = Desc;                              \
+#define CG_NODE_COMMON(NodeType, Name, Desc)                                        \
+  CG_STRONG_INLINE explicit NodeType(NodeDescriptor const *descriptor) noexcept     \
+      : NodeDerive<NodeType>(descriptor) {                                          \
+    ::compute_graph::intern::call_on_construct_if_presented<NodeType>::exec(*this); \
+  }                                                                                 \
+                                                                                    \
+protected:                                                                          \
+  using NodeDerive<NodeType>::on_connect;                                           \
+                                                                                    \
+public:                                                                             \
+  friend class NodeDescriptorBuilder<NodeType>;                                     \
+  static constexpr const char *name = Name;                                         \
+  static constexpr const char *description = Desc;                                  \
   CG_NODE_REGISTER_BODY(NodeType)
