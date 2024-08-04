@@ -21,6 +21,7 @@
 
 #pragma once
 #include <vector>
+#include <optional>
 
 #include "intern/node_descriptor.hpp"
 #include "intern/pp.hpp"
@@ -31,17 +32,17 @@ namespace compute_graph {
 
 class NodeBase {
 public:
-  CG_STRONG_INLINE explicit NodeBase(NodeDescriptor const *descriptor) noexcept
+  CG_STRONG_INLINE explicit NodeBase(NodeDescriptor const &descriptor) noexcept
       : inputs_{}, outputs_{}, descriptor_(descriptor) {
-    inputs_.reserve(descriptor->inputs().size());
-    outputs_.reserve(descriptor->outputs().size());
+    inputs_.reserve(descriptor.inputs().size());
+    outputs_.reserve(descriptor.outputs().size());
 
-    for (size_t i = 0; i < descriptor->inputs().size(); ++i) {
-      inputs_.push_back({descriptor->inputs()[i].type(), *this, i});
+    for (size_t i = 0; i < descriptor.inputs().size(); ++i) {
+      inputs_.push_back({descriptor.inputs()[i].type(), *this, i});
     }
 
-    for (size_t i = 0; i < descriptor->outputs().size(); ++i) {
-      outputs_.push_back({descriptor->outputs()[i].type(), *this, i});
+    for (size_t i = 0; i < descriptor.outputs().size(); ++i) {
+      outputs_.push_back({descriptor.outputs()[i].type(), *this, i});
     }
   }
 
@@ -55,17 +56,17 @@ public:
   // execute, may throw exception.
   virtual void operator()(Graph &) = 0;
 
-  CG_STRONG_INLINE NodeDescriptor const *descriptor() const noexcept { return descriptor_; }
+  CG_STRONG_INLINE NodeDescriptor const &descriptor() const noexcept { return descriptor_; }
 
   CG_STRONG_INLINE auto const &inputs() const noexcept { return inputs_; }
   CG_STRONG_INLINE auto const &outputs() const noexcept { return outputs_; }
 
   std::optional<size_t> find_input(std::string const &name) const noexcept {
-    return descriptor_->find_input(name);
+    return descriptor_.find_input(name);
   }
 
   std::optional<size_t> find_output(std::string const &name) const noexcept {
-    return descriptor_->find_output(name);
+    return descriptor_.find_output(name);
   }
 
   CG_NODE_EXTENSION
@@ -74,7 +75,17 @@ protected:
   virtual void on_connect(size_t /*index*/) noexcept {}
 
   CG_STRONG_INLINE TypeErasedPtr const &get_input(size_t index) const {
-    return (inputs_[index].fetch()).value();
+    return inputs_[index].fetch_payload();
+  }
+
+  template <typename T>
+  CG_STRONG_INLINE auto const *get_input(size_t index) const {
+#ifndef CG_NO_CHECK
+    if (inputs_[index].type() != typeid(T)) {
+      CG_THROW(std::invalid_argument, "Type mismatch");
+    }
+#endif
+    return static_cast<T const *>(get_input(index).get());
   }
 
   CG_STRONG_INLINE bool has_input(size_t index) const noexcept {
@@ -90,16 +101,16 @@ private:
   friend class Graph;
   std::vector<InputSocket> inputs_;
   std::vector<OutputSocket> outputs_;
-  NodeDescriptor const *const descriptor_;
+  NodeDescriptor const & descriptor_;
 };
 
 // crtp.
 template <typename Derived> class NodeDerive : public NodeBase {
 public:
-  CG_STRONG_INLINE explicit NodeDerive(NodeDescriptor const *descriptor) noexcept
+  CG_STRONG_INLINE explicit NodeDerive(NodeDescriptor const &descriptor) noexcept
       : NodeBase(descriptor) {}
 
-  virtual ~NodeDerive() noexcept = default;
+  ~NodeDerive() noexcept override = default;
 
   struct intern_node_traits {
     static constexpr const char *name = Derived::name;
@@ -154,7 +165,7 @@ protected:
   template <typename MT, typename = std::enable_if_t<intern::is_socket_meta_v<MT>>>
   CG_STRONG_INLINE auto const *get(MT) const {
     constexpr size_t index = MT::index;
-    return get_input(index).template as<std::add_const_t<typename MT::type>>();
+    return static_cast<typename MT::type const *>(get_input(index).get());
   }
 
   template <typename MT, typename = std::enable_if_t<intern::is_socket_meta_v<MT>>>
@@ -261,7 +272,7 @@ protected:
 
 // Use to define a node.
 #define CG_NODE_COMMON(NodeType, Name, Desc)                                        \
-  CG_STRONG_INLINE explicit NodeType(NodeDescriptor const *descriptor) noexcept     \
+  CG_STRONG_INLINE explicit NodeType(NodeDescriptor const &descriptor) noexcept     \
       : NodeDerive<NodeType>(descriptor) {                                          \
     ::compute_graph::intern::call_on_construct_if_presented<NodeType>::exec(*this); \
   }                                                                                 \

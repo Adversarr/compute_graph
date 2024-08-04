@@ -31,7 +31,7 @@
 
 namespace compute_graph {
 
-using NodeFactory = std::function<std::unique_ptr<NodeBase>(NodeDescriptor const *)>;
+using NodeFactory = std::function<std::unique_ptr<NodeBase>(NodeDescriptor const&)>;
 
 class NodeDescriptor {
 public:
@@ -68,7 +68,7 @@ public:
   CG_STRONG_INLINE NodeDescriptor(NodeDescriptor const &) = default;
   CG_STRONG_INLINE NodeDescriptor(NodeDescriptor &&) = default;
 
-  CG_STRONG_INLINE std::unique_ptr<NodeBase> build() const { return factory_(this); }
+  CG_STRONG_INLINE std::unique_ptr<NodeBase> build() const { return factory_(*this); }
   template <typename NodeType> friend class NodeDescriptorBuilder;
 
 private:
@@ -95,7 +95,7 @@ template <typename NodeType> class NodeDescriptorBuilder {
 public:
   CG_STRONG_INLINE NodeDescriptorBuilder(std::string name, std::string desc) noexcept
       : descriptor_(std::move(name), std::move(desc), typeid(NodeType),
-                    [](NodeDescriptor const *descriptor) {
+                    [](NodeDescriptor const &descriptor) {
                       return std::make_unique<NodeType>(descriptor);
                     }) {}
 
