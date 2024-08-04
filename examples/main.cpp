@@ -1,6 +1,6 @@
+#include <compute_graph/compute_graph.hpp>
 #include <iomanip>
 #include <iostream>
-#include <compute_graph/compute_graph.hpp>
 
 using namespace compute_graph;
 
@@ -10,25 +10,19 @@ public:
   CG_NODE_INPUTS();
   CG_NODE_OUTPUTS((int, value, "The constant integer value"));
 
-  void operator()(Graph &) final {
-    set(out::value, 5);
-  }
+  void operator()(Graph &) final { set(out::value, 5); }
 };
 
 class WhateverNode : public NodeDerive<WhateverNode> {
 public:
   CG_NODE_COMMON(WhateverNode, "Whatever", "WhateverDescription");
-  CG_NODE_INPUTS((int, x, "Describe x", 0  /* default value = 0 */),
+  CG_NODE_INPUTS((int, x, "Describe x", 0 /* default value = 0 */),
                  (int, y, "Describe y", 42 /* default value = 42 */));
   CG_NODE_OUTPUTS((std::string, z, "z equals x + y"));
 
-  static void on_register() /* optional */ {
-    printf("Do whatever you want!\n");
-  }
+  static void on_register() /* optional */ { printf("Do whatever you want!\n"); }
 
-  void on_construct() /* optional */ {
-    std::cout << "Constructing Whatever..." << std::endl;
-  }
+  void on_construct() /* optional */ { std::cout << "Constructing Whatever..." << std::endl; }
 
   void operator()(Graph &) final {
     auto x = get_or(in::x);
@@ -58,7 +52,10 @@ int main() {
   g.connect(nh3.output(ConstIntegerNode::out::value), nh1.input(WhateverNode::in::x));
   g.topology_sort();
 
-  for (auto const& node: g.nodes()) {
+  std::cout << nh3.node().input_index("value").value_or(-1) << std::endl;
+  std::cout << nh3.node().output_index("value").value_or(-1) << std::endl;
+
+  for (auto const &node : g.nodes()) {
     (*node)(g);
   }
 

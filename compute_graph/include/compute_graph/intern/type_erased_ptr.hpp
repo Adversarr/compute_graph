@@ -20,10 +20,10 @@
 // SOFTWARE.
 
 #pragma once
-#include "config.hpp"
 #include <functional>
-#include <stdexcept>
 #include <typeindex>
+
+#include "config.hpp"
 
 namespace compute_graph {
 
@@ -33,7 +33,7 @@ class TypeErasedPtr {
 public:
   CG_STRONG_INLINE void *get() noexcept { return data_; }
 
-  template <typename T> CG_STRONG_INLINE auto *as() CG_NOEXCEPT  {
+  template <typename T> CG_STRONG_INLINE auto *as() CG_NOEXCEPT {
     using U = std::decay_t<T>;
 #ifdef CG_NO_CHECK
     return static_cast<U *>(data_);
@@ -48,7 +48,7 @@ public:
 
   CG_STRONG_INLINE const void *get() const noexcept { return data_; }
 
-  template <typename T> CG_STRONG_INLINE const auto *as() const CG_NOEXCEPT  {
+  template <typename T> CG_STRONG_INLINE const auto *as() const CG_NOEXCEPT {
     using U = std::decay_t<T>;
 #ifdef CG_NO_CHECK
     return static_cast<const U *>(data_);
@@ -73,8 +73,7 @@ public:
   CG_STRONG_INLINE TypeErasedPtr &operator=(TypeErasedPtr const &) = delete;
   CG_STRONG_INLINE TypeErasedPtr &operator=(TypeErasedPtr &&) = delete;
   CG_STRONG_INLINE TypeErasedPtr(TypeErasedPtr &&another) noexcept
-      : data_(another.data_), type_(another.type_),
-        deleter_(std::move(another.deleter_)) {
+      : data_(another.data_), type_(another.type_), deleter_(std::move(another.deleter_)) {
     another.data_ = nullptr;
   }
 
@@ -96,4 +95,4 @@ CG_STRONG_INLINE TypeErasedPtr make_type_erased_ptr(Args &&...args) {
                        [](void *data) { delete static_cast<T *>(data); });
 }
 
-} // namespace compute_graph
+}  // namespace compute_graph

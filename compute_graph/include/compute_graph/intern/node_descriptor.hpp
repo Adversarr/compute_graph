@@ -19,15 +19,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-
 #pragma once
-#include "config.hpp"
-#include "socket_descriptor.hpp"
 #include <functional>
 #include <memory>
 #include <stdexcept>
 #include <utility>
 #include <vector>
+
+#include "config.hpp"
+#include "socket_descriptor.hpp"
 
 namespace compute_graph {
 using NodeRegistry = std::unordered_map<utype_ident, NodeDescriptor>;
@@ -38,9 +38,7 @@ NodeDescriptor const &register_node(NodeDescriptor const &descriptor);
 
 class NodeDescriptor {
 public:
-  CG_STRONG_INLINE std::vector<SocketDescriptor> const &inputs() const noexcept {
-    return inputs_;
-  }
+  CG_STRONG_INLINE std::vector<SocketDescriptor> const &inputs() const noexcept { return inputs_; }
 
   CG_STRONG_INLINE std::vector<SocketDescriptor> const &outputs() const noexcept {
     return outputs_;
@@ -50,7 +48,7 @@ public:
 
   CG_STRONG_INLINE std::string const &desc() const noexcept { return desc_; }
 
-  CG_STRONG_INLINE utype_ident const& type() const noexcept { return type_; }
+  CG_STRONG_INLINE utype_ident const &type() const noexcept { return type_; }
 
   CG_STRONG_INLINE NodeDescriptor(NodeDescriptor const &) = default;
 
@@ -58,14 +56,17 @@ public:
 
   CG_STRONG_INLINE std::unique_ptr<NodeBase> build() const { return factory_(this); }
 
-  template<typename NodeType> friend class NodeDescriptorBuilder;
+  template <typename NodeType> friend class NodeDescriptorBuilder;
 
 private:
   CG_STRONG_INLINE NodeDescriptor(std::string name, std::string desc, utype_ident type,
                                   NodeFactory factory) noexcept
-    : name_(std::move(name)), desc_(std::move(desc)), type_(std::move(type)),
-      factory_(std::move(factory)) {
-  }
+      : name_(std::move(name)),
+        desc_(std::move(desc)),
+        type_(std::move(type)),
+        factory_(std::move(factory)),
+        inputs_{},
+        outputs_{} {}
 
   const std::string name_;
   const std::string desc_;
@@ -75,17 +76,15 @@ private:
   std::vector<SocketDescriptor> outputs_;
 };
 
-template<typename NodeType>
-class NodeDescriptorBuilder {
-  static_assert(std::is_base_of_v<NodeBase, NodeType>,
-                "NodeType must be derived from NodeBase");
+template <typename NodeType> class NodeDescriptorBuilder {
+  static_assert(std::is_base_of_v<NodeBase, NodeType>, "NodeType must be derived from NodeBase");
 
 public:
   CG_STRONG_INLINE NodeDescriptorBuilder(std::string name, std::string desc) noexcept
-    : descriptor_(std::move(name), std::move(desc), typeid(NodeType),
-                  [](NodeDescriptor const *descriptor) {
-                    return std::make_unique<NodeType>(descriptor);
-                  }) {}
+      : descriptor_(std::move(name), std::move(desc), typeid(NodeType),
+                    [](NodeDescriptor const *descriptor) {
+                      return std::make_unique<NodeType>(descriptor);
+                    }) {}
 
   CG_STRONG_INLINE NodeDescriptorBuilder &input(SocketDescriptor const &desc) noexcept {
     descriptor_.inputs_.push_back(desc);
@@ -97,7 +96,9 @@ public:
     return *this;
   }
 
-  CG_STRONG_INLINE NodeDescriptor const &build() const noexcept { return register_node(descriptor_); }
+  CG_STRONG_INLINE NodeDescriptor const &build() const noexcept {
+    return register_node(descriptor_);
+  }
 
 private:
   NodeDescriptor descriptor_;
@@ -109,9 +110,7 @@ inline NodeRegistry &node_descriptors() {
 }
 
 CG_STRONG_INLINE NodeDescriptor const &register_node(NodeDescriptor const &descriptor) {
-  return node_descriptors()
-      .emplace(descriptor.type(), descriptor)
-      .first->second;
+  return node_descriptors().emplace(descriptor.type(), descriptor).first->second;
 }
 
 CG_STRONG_INLINE std::unique_ptr<NodeBase> create_node(utype_ident node_type) CG_NOEXCEPT {
@@ -125,9 +124,8 @@ CG_STRONG_INLINE std::unique_ptr<NodeBase> create_node(utype_ident node_type) CG
   return it->second.build();
 }
 
-template <typename T>
-CG_STRONG_INLINE std::unique_ptr<NodeBase> create_node() CG_NOEXCEPT {
+template <typename T> CG_STRONG_INLINE std::unique_ptr<NodeBase> create_node() CG_NOEXCEPT {
   return create_node(typeid(T));
 }
 
-} // namespace compute_graph
+}  // namespace compute_graph

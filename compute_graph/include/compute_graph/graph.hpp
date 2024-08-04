@@ -20,12 +20,13 @@
 // SOFTWARE.
 
 #pragma once
-#include "compute_graph/socket.hpp"
-#include "intern/config.hpp"
-#include "node.hpp"
 #include <any>
 #include <memory>
 #include <vector>
+
+#include "compute_graph/socket.hpp"
+#include "intern/config.hpp"
+#include "node.hpp"
 
 #define CG_PP_HANDLE_COMMON(HandleType)               \
   HandleType(HandleType const &) noexcept = default;  \
@@ -51,8 +52,10 @@ public:
   InputSocketHandle input(size_t index);
   OutputSocketHandle output(size_t index);
 
-  template <typename MT> InputSocketHandle input(MT);
-  template <typename MT> OutputSocketHandle output(MT);
+  template <typename MT, typename = std::enable_if_t<intern::is_socket_meta_v<MT>>>
+  InputSocketHandle input(MT);
+  template <typename MT, typename = std::enable_if_t<intern::is_socket_meta_v<MT>>>
+  OutputSocketHandle output(MT);
 
 private:
   NodeHandle(size_t index, NodeBase &node) : index_(index), node_(node) {}
@@ -66,9 +69,7 @@ class InputSocketHandle {
 public:
   CG_PP_HANDLE_COMMON(InputSocketHandle);
 
-  CG_STRONG_INLINE InputSocket const &operator*() const noexcept {
-    return node_.inputs()[index_];
-  }
+  CG_STRONG_INLINE InputSocket const &operator*() const noexcept { return node_.inputs()[index_]; }
   CG_STRONG_INLINE InputSocket const *operator->() const noexcept {
     return &node_.inputs()[index_];
   }
@@ -78,8 +79,7 @@ public:
   CG_STRONG_INLINE size_t index() const noexcept { return index_; }
 
 private:
-  CG_STRONG_INLINE InputSocketHandle(NodeBase &node, size_t index):
-      node_(node), index_(index) {}
+  CG_STRONG_INLINE InputSocketHandle(NodeBase &node, size_t index) : node_(node), index_(index) {}
 
   friend class Graph;
   friend class NodeHandle;
@@ -105,8 +105,7 @@ public:
   CG_STRONG_INLINE size_t index() const noexcept { return index_; }
 
 private:
-  CG_STRONG_INLINE OutputSocketHandle(NodeBase &node, size_t index):
-      node_(node), index_(index) {}
+  CG_STRONG_INLINE OutputSocketHandle(NodeBase &node, size_t index) : node_(node), index_(index) {}
 
   friend class Graph;
   friend class NodeHandle;
@@ -119,16 +118,12 @@ class Link {
 public:
   CG_PP_HANDLE_COMMON(Link);
 
-  CG_STRONG_INLINE OutputSocketHandle from() const noexcept {
-    return {from_, from_index_};
-  }
-  CG_STRONG_INLINE InputSocketHandle to() const noexcept {
-    return {to_, to_index_};
-  }
+  CG_STRONG_INLINE OutputSocketHandle from() const noexcept { return {from_, from_index_}; }
+  CG_STRONG_INLINE InputSocketHandle to() const noexcept { return {to_, to_index_}; }
 
 private:
-  CG_STRONG_INLINE Link(NodeBase &from, size_t from_index, NodeBase &to, size_t to_index):
-      from_(from), to_(to), from_index_(from_index), to_index_(to_index) {}
+  CG_STRONG_INLINE Link(NodeBase &from, size_t from_index, NodeBase &to, size_t to_index)
+      : from_(from), to_(to), from_index_(from_index), to_index_(to_index) {}
 
   friend class Graph;
   NodeBase &from_, &to_;
@@ -141,10 +136,7 @@ public:
   using node_container = std::vector<node_ptr>;
   using ctx_type = std::unordered_map<std::string, std::any>;
   using id_container = std::vector<size_t>;
-  using addr_to_index_map = std::unordered_map<NodeBase const *, size_t>;
-
-  template <typename T>
-  using typed_map = std::unordered_map<utype_ident, T>;
+  using node_addr_to_index_map = std::unordered_map<NodeBase const *, size_t>;
 
   Graph() = default;
   ~Graph() { clear(); }
@@ -157,6 +149,7 @@ public:
 
   // node op.
   NodeHandle add(std::unique_ptr<NodeBase> node);
+  std::optional<NodeHandle> get(NodeBase const *ptr) const noexcept;
   void erase(NodeHandle handle);
 
   // socket op
@@ -174,32 +167,27 @@ public:
 private:
   void rebuild_addr_to_index() noexcept;
 
-  node_container nodes_;
-  ctx_type ctx_;
-  id_container free_ids_;
-  addr_to_index_map addr_to_index_;
+  node_container nodes_{};
+  ctx_type ctx_{};
+  id_container free_ids_{};
+  node_addr_to_index_map addr_to_index_{};
   size_t uid_next_ = 0;
   size_t link_size_ = 0;
 };
-
 
 CG_STRONG_INLINE bool can_connect(OutputSocket const &from, InputSocket const &to) noexcept {
   return from.type() == to.type();
 }
 
-CG_STRONG_INLINE InputSocketHandle NodeHandle::input(size_t index) {
-  return {node_, index};
-}
+CG_STRONG_INLINE InputSocketHandle NodeHandle::input(size_t index) { return {node_, index}; }
 
-template<typename MT> CG_STRONG_INLINE InputSocketHandle NodeHandle::input(MT) {
+template <typename MT, typename> CG_STRONG_INLINE InputSocketHandle NodeHandle::input(MT) {
   return input(MT::index);
 }
 
-CG_STRONG_INLINE OutputSocketHandle NodeHandle::output(size_t index) {
-  return {node_, index};
-}
+CG_STRONG_INLINE OutputSocketHandle NodeHandle::output(size_t index) { return {node_, index}; }
 
-template<typename MT> CG_STRONG_INLINE OutputSocketHandle NodeHandle::output(MT) {
+template <typename MT, typename> CG_STRONG_INLINE OutputSocketHandle NodeHandle::output(MT) {
   return output(MT::index);
 }
 
@@ -232,12 +220,20 @@ CG_STRONG_INLINE NodeHandle Graph::add(std::unique_ptr<NodeBase> node) {
   }
 }
 
+CG_STRONG_INLINE std::optional<NodeHandle> Graph::get(NodeBase const *ptr) const noexcept {
+  if (auto it = addr_to_index_.find(ptr); it != addr_to_index_.end()) {
+    return NodeHandle{it->second, *nodes_[it->second]};
+  } else {
+    return std::nullopt;
+  }
+}
+
 CG_STRONG_INLINE void Graph::erase(NodeHandle handle) {
   size_t const index = handle.index();
   for (size_t i = 0; i < handle->inputs().size(); ++i) {
     auto const &input_sock = handle->inputs()[i];
     if (input_sock.is_connected()) {
-      auto const& output_sock = *input_sock.from();
+      auto const &output_sock = *input_sock.from();
       erase(Link{output_sock.node(), output_sock.index(), handle.node(), i});
     }
   }
@@ -257,13 +253,14 @@ CG_STRONG_INLINE void Graph::erase(NodeHandle handle) {
 
 CG_STRONG_INLINE Link Graph::connect(OutputSocketHandle from, InputSocketHandle to) CG_NOEXCEPT {
   if (!can_connect(*from, *to)) {
-    CG_THROW(std::invalid_argument,
-      "Cannot connect sockets of different types." + to_string(from->type()) + " and " + to_string(to->type()));
+    CG_THROW(std::invalid_argument, "Cannot connect sockets of different types."
+                                        + to_string(from->type()) + " and "
+                                        + to_string(to->type()));
   }
 
   // If already connected, erase the old link.
   if (to->is_connected()) {
-    OutputSocket const* previous_from = to->from();
+    OutputSocket const *previous_from = to->from();
     erase(Link{previous_from->node(), previous_from->index(), to->node(), to->index()});
   }
 
@@ -277,7 +274,8 @@ CG_STRONG_INLINE Link Graph::connect(OutputSocketHandle from, InputSocketHandle 
   return Link{from_node, from.index(), to_node, to.index()};
 }
 
-CG_STRONG_INLINE bool Graph::has_connect(OutputSocketHandle from, InputSocketHandle to) const noexcept {
+CG_STRONG_INLINE bool Graph::has_connect(OutputSocketHandle from,
+                                         InputSocketHandle to) const noexcept {
   return to->from() == from.operator->();
 }
 
@@ -293,10 +291,7 @@ CG_STRONG_INLINE void Graph::erase(Link link) {
   --link_size_;
 }
 
-
-CG_STRONG_INLINE bool Graph::has_cycle() const noexcept {
-  return topology_order().empty();
-}
+CG_STRONG_INLINE bool Graph::has_cycle() const noexcept { return topology_order().empty(); }
 
 CG_STRONG_INLINE void Graph::rebuild_addr_to_index() noexcept {
   addr_to_index_.clear();
@@ -310,7 +305,7 @@ CG_STRONG_INLINE void Graph::topology_sort() {
   auto const order = topology_order();
   node_container new_nodes;
   new_nodes.reserve(nodes_.size());
-  for (size_t i: order) {
+  for (size_t i : order) {
     new_nodes.push_back(std::move(nodes_[i]));
   }
   nodes_ = std::move(new_nodes);
@@ -322,9 +317,9 @@ CG_STRONG_INLINE std::vector<size_t> Graph::topology_order() const noexcept {
   result.reserve(n);
   std::vector<size_t> connected_count(n, 0);
   for (size_t i = 0; i < n; ++i) {
-    auto const& node = nodes_[i];
+    auto const &node = nodes_[i];
     size_t count = 0;
-    for (auto const& input: node->inputs()) {
+    for (auto const &input : node->inputs()) {
       count += input.is_connected() ? 1 : 0;
     }
     connected_count[i] = count;
@@ -334,13 +329,13 @@ CG_STRONG_INLINE std::vector<size_t> Graph::topology_order() const noexcept {
   }
 
   for (size_t i = 0; i < result.size(); ++i) {
-    auto const& node = nodes_[result[i]];
-    for (auto const& output: node->outputs()) {
-      for (auto const* to_socket: output.connected_sockets()) {
+    auto const &node = nodes_[result[i]];
+    for (auto const &output : node->outputs()) {
+      for (auto const *to_socket : output.connected_sockets()) {
         if (size_t const to_index = addr_to_index_.at(&(to_socket->node()));
             --connected_count[to_index] == 0) {
           result.push_back(to_index);
-            }
+        }
       }
     }
   }
@@ -352,4 +347,4 @@ CG_STRONG_INLINE std::vector<size_t> Graph::topology_order() const noexcept {
   }
 }
 
-}
+}  // namespace compute_graph

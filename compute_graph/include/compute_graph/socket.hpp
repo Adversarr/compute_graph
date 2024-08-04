@@ -20,8 +20,8 @@
 // SOFTWARE.
 
 #pragma once
-#include <optional>
 #include <algorithm>
+#include <optional>
 
 #include "intern/config.hpp"
 #include "intern/type_erased_ptr.hpp"
@@ -30,7 +30,7 @@ namespace compute_graph {
 
 using Payload = std::optional<TypeErasedPtr>;
 
-class OutputSocket final {
+class OutputSocket {
 public:
   utype_ident type() const noexcept { return type_; }
 
@@ -45,18 +45,21 @@ public:
   CG_STRONG_INLINE Payload &payload() noexcept { return payload_; }
 
   CG_STRONG_INLINE size_t index() const noexcept { return index_; }
-  CG_STRONG_INLINE NodeBase& node() const noexcept { return node_; }
-  OutputSocket(OutputSocket&& ) = default;
+  CG_STRONG_INLINE NodeBase &node() const noexcept { return node_; }
+
+  CG_STRONG_INLINE OutputSocket(OutputSocket const &) = delete;
+  CG_STRONG_INLINE OutputSocket(OutputSocket &&) noexcept = default;
+  CG_STRONG_INLINE OutputSocket &operator=(OutputSocket const &) = delete;
+  CG_STRONG_INLINE OutputSocket &operator=(OutputSocket &&) = delete;
 
 private:
-  CG_STRONG_INLINE OutputSocket(utype_ident type, NodeBase& node, size_t index) noexcept:
-    type_(type), node_(node), index_(index) {}
+  CG_STRONG_INLINE OutputSocket(utype_ident type, NodeBase &node, size_t index) noexcept
+      : type_(type), connected_sockets_{}, payload_(std::nullopt), node_(node), index_(index) {}
 
-  CG_STRONG_INLINE void erase(InputSocket const& to) noexcept {
-    connected_sockets_.erase(
-        std::remove_if(connected_sockets_.begin(), connected_sockets_.end(),
-                       [&to](auto const &socket) { return socket == &to; }),
-        connected_sockets_.end());
+  CG_STRONG_INLINE void erase(InputSocket const &to) noexcept {
+    connected_sockets_.erase(std::remove_if(connected_sockets_.begin(), connected_sockets_.end(),
+                                            [&to](auto const &socket) { return socket == &to; }),
+                             connected_sockets_.end());
   }
 
   CG_STRONG_INLINE void connect(InputSocket const &to) noexcept {
@@ -72,7 +75,7 @@ private:
   size_t const index_;
 };
 
-class InputSocket final {
+class InputSocket {
 public:
   CG_STRONG_INLINE utype_ident type() const noexcept { return type_; }
 
@@ -88,11 +91,14 @@ public:
   CG_STRONG_INLINE NodeBase &node() const noexcept { return node_; }
   CG_STRONG_INLINE size_t index() const noexcept { return index_; }
 
-  CG_STRONG_INLINE InputSocket(InputSocket&& ) = default;
+  CG_STRONG_INLINE InputSocket(InputSocket &&) noexcept = default;
+  CG_STRONG_INLINE InputSocket(InputSocket const &) = delete;
+  CG_STRONG_INLINE InputSocket &operator=(InputSocket const &) = delete;
+  CG_STRONG_INLINE InputSocket &operator=(InputSocket &&) = delete;
 
 private:
-  CG_STRONG_INLINE InputSocket(utype_ident type, NodeBase& node, size_t const index) noexcept:
-    type_(std::move(type)), node_(node), index_(index), from_{nullptr} {}
+  CG_STRONG_INLINE InputSocket(utype_ident type, NodeBase &node, size_t const index) noexcept
+      : type_(std::move(type)), node_(node), index_(index), from_{nullptr} {}
   CG_STRONG_INLINE void clear() noexcept { from_ = nullptr; }
   CG_STRONG_INLINE void connect(OutputSocket const *from) noexcept { from_ = from; }
 
@@ -104,4 +110,4 @@ private:
   OutputSocket const *from_;
 };
 
-}
+}  // namespace compute_graph

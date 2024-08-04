@@ -26,10 +26,8 @@ namespace compute_graph {
 
 class SocketDescriptor {
 public:
-  CG_STRONG_INLINE SocketDescriptor(utype_ident type, std::string name,
-                   std::string desc) noexcept
-      : type_(std::move(type)), name_(std::move(name)), desc_(std::move(desc)) {
-  }
+  CG_STRONG_INLINE SocketDescriptor(utype_ident type, std::string name, std::string desc) noexcept
+      : type_(std::move(type)), name_(std::move(name)), desc_(std::move(desc)) {}
   CG_STRONG_INLINE SocketDescriptor(SocketDescriptor const &) noexcept = default;
   CG_STRONG_INLINE SocketDescriptor(SocketDescriptor &&) noexcept = default;
 
@@ -48,4 +46,4 @@ CG_STRONG_INLINE SocketDescriptor make_socket_descriptor(std::string name, std::
   return {typeid(T), std::move(name), std::move(desc)};
 }
 
-} // namespace compute_graph
+}  // namespace compute_graph

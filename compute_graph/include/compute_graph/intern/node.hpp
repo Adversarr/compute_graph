@@ -19,7 +19,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-
 #pragma once
 #include "config.hpp"
 
@@ -39,8 +38,7 @@ template <size_t N, size_t Low> struct static_for<N, Low, N> {
   static CG_STRONG_INLINE void eval(Args &...) {}
 };
 
-template <size_t Low, size_t High, template <size_t> typename Fn,
-          typename... Args>
+template <size_t Low, size_t High, template <size_t> typename Fn, typename... Args>
 CG_STRONG_INLINE void static_for_eval(Args &...args) {
   static_for<Low, Low, High>().template eval<Fn, Args...>(args...);
 }
@@ -62,30 +60,22 @@ struct count_meta<T, current, false> {
   static constexpr size_t count = 0;
 };
 
-template <template <size_t, typename> typename T>
-constexpr size_t count_meta_v = count_meta<T, 0>::count;
+template <template <size_t, typename> typename T> constexpr size_t count_meta_v
+    = count_meta<T, 0>::count;
 
-template <typename T>
-constexpr size_t count_socket_v = count_meta_v<T::template socket_meta>;
+template <typename T> constexpr size_t count_socket_v = count_meta_v<T::template socket_meta>;
 
-
-template<typename, typename T>
-struct has_default_value {
-  static_assert(
-    std::integral_constant<T, false>::value,
-    "Second template parameter needs to be of function type.");
+template <typename, typename T> struct has_default_value {
+  static_assert(std::integral_constant<T, false>::value,
+                "Second template parameter needs to be of function type.");
 };
 
-template<typename C, typename Ret>
-struct has_default_value<C, Ret()> {
+template <typename C, typename Ret> struct has_default_value<C, Ret()> {
 private:
-  template<typename T>
-  static constexpr auto check(T *)
-    -> typename
-    std::is_same<decltype(T::default_value()), Ret>::type;
+  template <typename T> static constexpr auto check(T *) ->
+      typename std::is_same<decltype(T::default_value()), Ret>::type;
 
-  template<typename>
-  static constexpr std::false_type check(...);
+  template <typename> static constexpr std::false_type check(...);
 
   typedef decltype(check<C>(nullptr)) type;
 
@@ -93,16 +83,12 @@ public:
   static constexpr bool value = type::value;
 };
 
-template<typename C>
-struct has_on_register {
+template <typename C> struct has_on_register {
 private:
-  template<typename T>
-  static constexpr auto check(T *)
-    -> typename
-    std::is_same<decltype(T::on_register()), void>::type;
+  template <typename T> static constexpr auto check(T *) ->
+      typename std::is_same<decltype(T::on_register()), void>::type;
 
-  template<typename>
-  static constexpr std::false_type check(...);
+  template <typename> static constexpr std::false_type check(...);
 
   typedef decltype(check<C>(nullptr)) type;
 
@@ -110,16 +96,12 @@ public:
   static constexpr bool value = type::value;
 };
 
-template<typename C>
-struct has_on_construct {
+template <typename C> struct has_on_construct {
 private:
-  template<typename T>
-  static constexpr auto check(T *)
-    -> typename
-    std::is_same<decltype(std::declval<T>().on_construct()), void>::type;
+  template <typename T> static constexpr auto check(T *) ->
+      typename std::is_same<decltype(std::declval<T>().on_construct()), void>::type;
 
-  template<typename>
-  static constexpr std::false_type check(...);
+  template <typename> static constexpr std::false_type check(...);
 
   typedef decltype(check<C>(nullptr)) type;
 
@@ -127,40 +109,39 @@ public:
   static constexpr bool value = type::value;
 };
 
-template<typename C, bool is_valid_call = has_on_register<C>::value>
+template <typename C, bool is_valid_call = has_on_register<C>::value>
 struct call_on_register_if_presented;
 
-template<typename C>
-struct call_on_register_if_presented<C, true> {
+template <typename C> struct call_on_register_if_presented<C, true> {
   static CG_STRONG_INLINE void exec() { C::on_register(); }
 };
 
-template<typename C>
-struct call_on_register_if_presented<C, false> {
+template <typename C> struct call_on_register_if_presented<C, false> {
   static CG_STRONG_INLINE void exec() {}
 };
 
-template<typename C, bool is_valid_call = has_on_construct<C>::value>
+template <typename C, bool is_valid_call = has_on_construct<C>::value>
 struct call_on_construct_if_presented;
 
-template<typename C>
-struct call_on_construct_if_presented<C, true> {
-  static CG_STRONG_INLINE void exec(C& c) { c.on_construct(); }
+template <typename C> struct call_on_construct_if_presented<C, true> {
+  static CG_STRONG_INLINE void exec(C &c) { c.on_construct(); }
 };
 
-template<typename C>
-struct call_on_construct_if_presented<C, false> {
-  static CG_STRONG_INLINE void exec(C&) {}
+template <typename C> struct call_on_construct_if_presented<C, false> {
+  static CG_STRONG_INLINE void exec(C &) {}
 };
 
-template<typename M>
-static constexpr bool has_default_value_v = has_default_value<M, typename M::type const&()>::value;
+template <typename M> static constexpr bool has_default_value_v
+    = has_default_value<M, typename M::type const &()>::value;
 
-template<typename M>
-static constexpr bool has_on_register_v = has_on_register<M>::value;
+template <typename M> static constexpr bool has_on_register_v = has_on_register<M>::value;
 
-template<typename M>
-static constexpr bool has_on_construct_v = has_on_construct<M>::value;
+template <typename M> static constexpr bool has_on_construct_v = has_on_construct<M>::value;
 
-} // namespace intern
-} // namespace compute_graph
+struct socket_meta_base {};
+
+template <typename T> using is_socket_meta = std::is_base_of<socket_meta_base, T>;
+
+template <typename T> constexpr bool is_socket_meta_v = is_socket_meta<T>::value;
+}  // namespace intern
+}  // namespace compute_graph
