@@ -2,3 +2,6 @@
 .cache
 build
 cmake-build*
+out
+.vs
+CMakeSettings.json

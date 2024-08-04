@@ -19,12 +19,36 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+// NOTE: Possible control macros are
+//   CG_NO_AUTO_REGISTER:-----------------------------------------------------+
+//   |  Controls whether to automatically register nodes before main().       |
+//   |  Define this macro to disable auto registration, used in `node.hpp`.   |
+//   +------------------------------------------------------------------------+
+//   CG_NO_STRONG_INLINE:-----------------------------------------------------+
+//   |  controls whether to use __forceinline or not, see below.              |
+//   |  Define this macro to disable __forceinline, otherwise just `inline`.  |
+//   +------------------------------------------------------------------------+
 #pragma once
 
 #include <cstddef>
 #include <string>
 #include <typeindex>
 #include <variant>
+
+#ifdef CG_NO_STRONG_INLINE
+#define CG_STRONG_INLINE inline
+#else
+#ifdef _MSC_VER
+#define CG_STRONG_INLINE __forceinline
+#elif defined(__GNUC__)
+#define CG_STRONG_INLINE inline __attribute__((always_inline))
+#elif defined(__clang__)
+#define CG_STRONG_INLINE inline __attribute__((always_inline))
+#else
+#define CG_STRONG_INLINE inline
+#endif
+#endif
+
 
 namespace compute_graph {
 
@@ -37,17 +61,16 @@ class NodeBase;     // Base type for each node.
 class InputSocket;  // a socket on a node.
 class OutputSocket; // a socket on a node.
 class Link;         // one connection between two sockets.
-class PayloadBase;  // the data that flows through the pipe.
 class Graph;        // the context of the graph.
 
 using TypeIndex = std::type_index;
 using utype_ident = std::variant<std::string, TypeIndex>;
 
-inline std::string to_string(TypeIndex type_index) {
+CG_STRONG_INLINE std::string to_string(TypeIndex type_index) {
   return type_index.name();
 }
 
-inline std::string to_string(utype_ident ident) {
+CG_STRONG_INLINE std::string to_string(utype_ident ident) {
   return std::visit([](auto&& arg) -> std::string {
     using T = std::decay_t<decltype(arg)>;
     if constexpr (std::is_same_v<T, std::string>) {
@@ -62,7 +85,7 @@ inline std::string to_string(utype_ident ident) {
 
 template<>
 struct std::hash<compute_graph::utype_ident> {
-  constexpr std::size_t operator()(const compute_graph::utype_ident &id) const noexcept {
+  CG_STRONG_INLINE std::size_t operator()(const compute_graph::utype_ident &id) const noexcept {
     return std::visit(
       [](auto &&arg) -> std::size_t {
         using T = std::decay_t<decltype(arg)>;

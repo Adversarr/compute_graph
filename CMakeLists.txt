@@ -1,7 +1,7 @@
-cmake_minimum_required(VERSION 3.29)
+cmake_minimum_required(VERSION 3.10)
 project(compute_graph)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 add_library(compute_graph INTERFACE)
 
@@ -30,6 +30,5 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clan
 endif()
 
 if (MSVC)
-    target_compile_options(compute_graph_exec PRIVATE
-            /W4 /WX)
+    target_compile_options(compute_graph_exec PRIVATE /W4)
 endif()

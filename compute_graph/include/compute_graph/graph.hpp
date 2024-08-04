@@ -141,8 +141,9 @@ public:
   using typed_map = std::unordered_map<utype_ident, T>;
 
   Graph() = default;
+  ~Graph() { clear(); }
   void clear();
-  size_t num_nodes() const noexcept { return nodes_.size(); }
+  size_t num_nodes() const noexcept { return nodes_.size() - free_ids_.size(); }
   size_t num_links() const noexcept { return link_size_; }
 
   node_container const &nodes() const noexcept { return nodes_; }
@@ -154,7 +155,7 @@ public:
 
   // socket op
   Link connect(OutputSocketHandle from, InputSocketHandle to);
-  Link get(OutputSocketHandle from, InputSocketHandle to);
+  bool has_connect(OutputSocketHandle from, InputSocketHandle to) const noexcept;
   void erase(Link link);
 
   // context op
@@ -194,6 +195,21 @@ inline OutputSocketHandle NodeHandle::output(size_t index) {
 
 template<typename MT> OutputSocketHandle NodeHandle::output(MT) {
   return output(MT::index);
+}
+
+inline void Graph::clear() {
+  while (!nodes_.empty()) {
+    if (nodes_.back()) {
+      erase(NodeHandle{nodes_.size() - 1, *nodes_.back()});
+    }
+    nodes_.pop_back();
+  }
+  nodes_.clear();
+  free_ids_.clear();
+  addr_to_index_.clear();
+  uid_next_ = 0;
+  link_size_ = 0;
+  ctx_.clear();
 }
 
 inline NodeHandle Graph::add(std::unique_ptr<NodeBase> node) {
@@ -252,6 +268,10 @@ inline Link Graph::connect(OutputSocketHandle from, InputSocketHandle to) {
 
   // TODO: callback.
   return Link{from_node, from.index(), to_node, to.index()};
+}
+
+inline bool Graph::has_connect(OutputSocketHandle from, InputSocketHandle to) const noexcept {
+  return to->from() == from.operator->();
 }
 
 inline void Graph::erase(Link link) {

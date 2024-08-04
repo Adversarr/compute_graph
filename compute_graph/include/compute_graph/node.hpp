@@ -24,7 +24,7 @@
 
 #include "intern/node.hpp"
 #include "intern/node_descriptor.hpp"
-#include "intern/pp.hpp" // IWYU pragma: export
+#include "intern/pp.hpp"
 #include "socket.hpp"
 
 namespace compute_graph {
@@ -147,3 +147,71 @@ protected:
 };
 
 }
+
+// Helper macros to define a node.
+#define CG_NODE_SOCKET_IMPL(ith, Type, Name, desc, ...)         \
+  template <typename _WHATEVER> struct socket_meta<ith, _WHATEVER> {  \
+    using type = Type;                                                \
+    static constexpr size_t index = ith;                              \
+    static constexpr const char *name = #Name;                        \
+    static constexpr const char* description = desc;                  \
+    __VA_OPT__(                                                       \
+      inline static Type const& default_value()  {                    \
+      static Type _v {__VA_ARGS__}; return _v;                        \
+    } )                                                               \
+  };                                                                  \
+  using Name##_t = socket_meta<ith, int>;                             \
+  static constexpr Name##_t Name{};
+
+#define CG_NODE_PP_ADAPTOR(x, i) \
+    CG_PP_EVAL(CG_NODE_SOCKET_IMPL CG_PP_EMPTY() (i, CG_PP_TUPLE_UNPACK x))
+
+
+// Usage:
+// CG_NODE_INPUTS(
+//    (<type>, <identifier>, <description>, <optional-default-value>),
+//    (<type>, <identifier>, <description>, <optional-default-value>),
+//    ...);
+// Example:
+// CG_NODE_INPUTS(
+//    (int,         x, "integer input", 0 /* default = 0      */),
+//    (std::string, y, "string input"     /* no default value */),
+#define CG_NODE_INPUTS(...)                                               \
+    typedef struct intern_input_meta {                                    \
+      template<size_t I, typename=int> struct socket_meta {               \
+        using type = void;                                                \
+      };                                                                  \
+      __VA_OPT__(CG_PP_VAOPT_FOR_EACH_I(CG_NODE_PP_ADAPTOR, __VA_ARGS__)) \
+    } in
+
+// Usage:
+// CG_NODE_OUTPUTS(
+//    (<type>, <identifier>, <description>),
+//    (<type>, <identifier>, <description>),
+//    ...);
+#define CG_NODE_OUTPUTS(...) \
+    typedef struct intern_output_meta { \
+      template<size_t I, typename = int> struct socket_meta {             \
+        using type = void;                                                \
+      };                                                                  \
+      __VA_OPT__(CG_PP_VAOPT_FOR_EACH_I(CG_NODE_PP_ADAPTOR, __VA_ARGS__)) \
+    } out
+
+
+#ifdef CG_NO_AUTO_REGISTER
+#define CG_NODE_REGISTER_BODY(NodeType) /* empty */
+#else
+#define CG_NODE_REGISTER_BODY(NodeType)                                        \
+  struct intern_auto_register {                                                \
+    intern_auto_register() { NodeType::register_node(); }                      \
+  }; inline static const intern_auto_register intern_register
+#endif
+
+// Use to define a node.
+#define CG_NODE_COMMON(NodeType, Name, Desc)                                   \
+  explicit NodeType(NodeDescriptor const *descriptor) noexcept                 \
+      : NodeDerive<NodeType>(descriptor) {}                                    \
+  friend class NodeDescriptorBuilder<NodeType>;                                \
+  static constexpr const char *name = Name;                                    \
+  static constexpr const char *description = Desc;                             \
+  CG_NODE_REGISTER_BODY(NodeType)
