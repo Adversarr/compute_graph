@@ -23,7 +23,7 @@ public:
   CG_NODE_OUTPUTS((std::string, z, "z equals x + y"));
 
   static void on_register() /* optional */ {
-    std::cout << "Do whatever you want!" << std::endl;
+    printf("Do whatever you want!\n");
   }
 
   void operator()(Graph &) final {

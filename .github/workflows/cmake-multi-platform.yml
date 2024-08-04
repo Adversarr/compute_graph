@@ -27,15 +27,18 @@ jobs:
         build_type: [Release]
         c_compiler: [gcc, clang, cl]
         include:
-          # - os: windows-latest
-          #   c_compiler: cl
-          #   cpp_compiler: cl
+          - os: windows-latest
+            c_compiler: cl
+            cpp_compiler: cl
+            executable: compute_graph_exec.exe
           - os: ubuntu-latest
             c_compiler: gcc
             cpp_compiler: g++
+            executable: compute_graph_exec
           - os: ubuntu-latest
             c_compiler: clang
             cpp_compiler: clang++
+            executable: compute_graph_exec
         exclude:
           - os: windows-latest
             c_compiler: gcc
@@ -72,4 +75,4 @@ jobs:
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
       # Execute tests defined by the CMake configuration. Note that --build-config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
-      run: ./compute_graph_exec
+      run: ./${{ matrix.executable }}
