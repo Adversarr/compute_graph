@@ -1,6 +1,6 @@
 #include <iomanip>
 #include <iostream>
-#include "compute_graph/graph.hpp"
+#include <compute_graph/compute_graph.hpp>
 
 using namespace compute_graph;
 
@@ -24,6 +24,10 @@ public:
 
   static void on_register() /* optional */ {
     printf("Do whatever you want!\n");
+  }
+
+  void on_construct() /* optional */ {
+    std::cout << "Constructing Whatever..." << std::endl;
   }
 
   void operator()(Graph &) final {
@@ -50,7 +54,6 @@ int main() {
   auto nh1 = g.add(create_node<WhateverNode>()),
        nh2 = g.add(create_node<EchoString>()),
        nh3 = g.add(create_node<ConstIntegerNode>());
-
   g.connect(nh1.output(WhateverNode::out::z), nh2.input(EchoString::in::str));
   g.connect(nh3.output(ConstIntegerNode::out::value), nh1.input(WhateverNode::in::x));
   g.topology_sort();

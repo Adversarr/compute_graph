@@ -24,11 +24,11 @@
 #include "config.hpp"
 
 namespace compute_graph {
-
 namespace intern {
+
 template <size_t N, size_t Low, size_t High> struct static_for {
   template <template <size_t> typename Fn, typename... Args>
-  static constexpr void eval(Args &...args) {
+  static CG_STRONG_INLINE void eval(Args &...args) {
     Fn<N>::eval(args...);
     static_for<N + 1, Low, High>().template eval<Fn>(args...);
   }
@@ -36,12 +36,12 @@ template <size_t N, size_t Low, size_t High> struct static_for {
 
 template <size_t N, size_t Low> struct static_for<N, Low, N> {
   template <template <size_t> typename Fn, typename... Args>
-  static constexpr void eval(Args &...) {}
+  static CG_STRONG_INLINE void eval(Args &...) {}
 };
 
 template <size_t Low, size_t High, template <size_t> typename Fn,
           typename... Args>
-constexpr void static_for_eval(Args &...args) {
+CG_STRONG_INLINE void static_for_eval(Args &...args) {
   static_for<Low, Low, High>().template eval<Fn, Args...>(args...);
 }
 
@@ -110,22 +110,57 @@ public:
   static constexpr bool value = type::value;
 };
 
+template<typename C>
+struct has_on_construct {
+private:
+  template<typename T>
+  static constexpr auto check(T *)
+    -> typename
+    std::is_same<decltype(std::declval<T>().on_construct()), void>::type;
+
+  template<typename>
+  static constexpr std::false_type check(...);
+
+  typedef decltype(check<C>(nullptr)) type;
+
+public:
+  static constexpr bool value = type::value;
+};
+
 template<typename C, bool is_valid_call = has_on_register<C>::value>
 struct call_on_register_if_presented;
 
 template<typename C>
 struct call_on_register_if_presented<C, true> {
-  static void exec() { C::on_register(); }
+  static CG_STRONG_INLINE void exec() { C::on_register(); }
 };
 
 template<typename C>
 struct call_on_register_if_presented<C, false> {
-  static void exec() {
-  }
+  static CG_STRONG_INLINE void exec() {}
+};
+
+template<typename C, bool is_valid_call = has_on_construct<C>::value>
+struct call_on_construct_if_presented;
+
+template<typename C>
+struct call_on_construct_if_presented<C, true> {
+  static CG_STRONG_INLINE void exec(C& c) { c.on_construct(); }
+};
+
+template<typename C>
+struct call_on_construct_if_presented<C, false> {
+  static CG_STRONG_INLINE void exec(C&) {}
 };
 
 template<typename M>
 static constexpr bool has_default_value_v = has_default_value<M, typename M::type const&()>::value;
-} // namespace intern
 
-}
+template<typename M>
+static constexpr bool has_on_register_v = has_on_register<M>::value;
+
+template<typename M>
+static constexpr bool has_on_construct_v = has_on_construct<M>::value;
+
+} // namespace intern
+} // namespace compute_graph

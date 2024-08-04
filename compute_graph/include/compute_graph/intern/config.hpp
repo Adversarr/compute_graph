@@ -28,6 +28,13 @@
 //   |  controls whether to use __forceinline or not, see below.              |
 //   |  Define this macro to disable __forceinline, otherwise just `inline`.  |
 //   +------------------------------------------------------------------------+
+//   CG_NODE_EXTENSION:-------------------------------------------------------+
+//   |  A control macro that can be defined to add extra code to the node     |
+//   |  class. This is useful for adding extra methods or members to the      |
+//   |  node class.                                                           |
+//   +------------------------------------------------------------------------+
+
+
 #pragma once
 
 #include <cstddef>
@@ -49,6 +56,9 @@
 #endif
 #endif
 
+#ifndef CG_NODE_EXTENSION
+#define CG_NODE_EXTENSION /* empty */
+#endif
 
 namespace compute_graph {
 

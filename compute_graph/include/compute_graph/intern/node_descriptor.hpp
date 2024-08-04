@@ -38,31 +38,31 @@ NodeDescriptor const &register_node(NodeDescriptor const &descriptor);
 
 class NodeDescriptor {
 public:
-  std::vector<SocketDescriptor> const &inputs() const noexcept {
+  CG_STRONG_INLINE std::vector<SocketDescriptor> const &inputs() const noexcept {
     return inputs_;
   }
 
-  std::vector<SocketDescriptor> const &outputs() const noexcept {
+  CG_STRONG_INLINE std::vector<SocketDescriptor> const &outputs() const noexcept {
     return outputs_;
   }
 
-  std::string const &name() const noexcept { return name_; }
+  CG_STRONG_INLINE std::string const &name() const noexcept { return name_; }
 
-  std::string const &desc() const noexcept { return desc_; }
+  CG_STRONG_INLINE std::string const &desc() const noexcept { return desc_; }
 
-  utype_ident const& type() const noexcept { return type_; }
+  CG_STRONG_INLINE utype_ident const& type() const noexcept { return type_; }
 
-  NodeDescriptor(NodeDescriptor const &) = default;
+  CG_STRONG_INLINE NodeDescriptor(NodeDescriptor const &) = default;
 
-  NodeDescriptor(NodeDescriptor &&) = default;
+  CG_STRONG_INLINE NodeDescriptor(NodeDescriptor &&) = default;
 
-  std::unique_ptr<NodeBase> build() const { return factory_(this); }
+  CG_STRONG_INLINE std::unique_ptr<NodeBase> build() const { return factory_(this); }
 
   template<typename NodeType> friend class NodeDescriptorBuilder;
 
 private:
-  NodeDescriptor(std::string name, std::string desc, utype_ident type,
-                 NodeFactory factory) noexcept
+  CG_STRONG_INLINE NodeDescriptor(std::string name, std::string desc, utype_ident type,
+                                  NodeFactory factory) noexcept
     : name_(std::move(name)), desc_(std::move(desc)), type_(std::move(type)),
       factory_(std::move(factory)) {
   }
@@ -81,23 +81,23 @@ class NodeDescriptorBuilder {
                 "NodeType must be derived from NodeBase");
 
 public:
-  NodeDescriptorBuilder(std::string name, std::string desc) noexcept
+  CG_STRONG_INLINE NodeDescriptorBuilder(std::string name, std::string desc) noexcept
     : descriptor_(std::move(name), std::move(desc), typeid(NodeType),
                   [](NodeDescriptor const *descriptor) {
                     return std::make_unique<NodeType>(descriptor);
                   }) {}
 
-  NodeDescriptorBuilder &input(SocketDescriptor const &desc) noexcept {
+  CG_STRONG_INLINE NodeDescriptorBuilder &input(SocketDescriptor const &desc) noexcept {
     descriptor_.inputs_.push_back(desc);
     return *this;
   }
 
-  NodeDescriptorBuilder &output(SocketDescriptor const &desc) noexcept {
+  CG_STRONG_INLINE NodeDescriptorBuilder &output(SocketDescriptor const &desc) noexcept {
     descriptor_.outputs_.push_back(desc);
     return *this;
   }
 
-  NodeDescriptor const &build() const noexcept { return register_node(descriptor_); }
+  CG_STRONG_INLINE NodeDescriptor const &build() const noexcept { return register_node(descriptor_); }
 
 private:
   NodeDescriptor descriptor_;
@@ -108,13 +108,13 @@ inline NodeRegistry &node_descriptors() {
   return descriptors;
 }
 
-inline NodeDescriptor const &register_node(NodeDescriptor const &descriptor) {
+CG_STRONG_INLINE NodeDescriptor const &register_node(NodeDescriptor const &descriptor) {
   return node_descriptors()
       .emplace(descriptor.type(), descriptor)
       .first->second;
 }
 
-inline std::unique_ptr<NodeBase> create_node(utype_ident node_type) {
+CG_STRONG_INLINE std::unique_ptr<NodeBase> create_node(utype_ident node_type) {
   const auto &descriptors = node_descriptors();
   auto const it = descriptors.find(node_type);
   if (it == descriptors.end()) {
@@ -123,7 +123,8 @@ inline std::unique_ptr<NodeBase> create_node(utype_ident node_type) {
   return it->second.build();
 }
 
-template <typename T> std::unique_ptr<NodeBase> create_node() {
+template <typename T>
+CG_STRONG_INLINE std::unique_ptr<NodeBase> create_node() {
   return create_node(typeid(T));
 }
 

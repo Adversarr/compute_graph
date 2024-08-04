@@ -27,6 +27,12 @@
 #include <memory>
 #include <vector>
 
+#define CG_PP_HANDLE_COMMON(HandleType)               \
+  HandleType(HandleType const &) noexcept = default;  \
+  HandleType(HandleType &&) noexcept = default;       \
+  HandleType &operator=(HandleType const &) = delete; \
+  HandleType &operator=(HandleType &&) = delete
+
 namespace compute_graph {
 
 class InputSocketHandle;
@@ -34,20 +40,14 @@ class OutputSocketHandle;
 
 class NodeHandle {
 public:
-  NodeHandle(NodeHandle const &) = default;
-  NodeHandle(NodeHandle &&) = default;
-  NodeHandle &operator=(NodeHandle const &) = delete;
-  NodeHandle &operator=(NodeHandle &&) = delete;
-
-  NodeBase const &operator*() const noexcept { return node_; }
-  NodeBase &operator*() noexcept { return node_; }
-  NodeBase const *operator->() const noexcept { return &node_; }
-  NodeBase *operator->() noexcept { return &node_; }
-  NodeBase &node() noexcept { return node_; }
-  NodeBase const &node() const noexcept { return node_; }
-
-  size_t index() const noexcept { return index_; }
-
+  CG_PP_HANDLE_COMMON(NodeHandle);
+  CG_STRONG_INLINE NodeBase const &operator*() const noexcept { return node_; }
+  CG_STRONG_INLINE NodeBase &operator*() noexcept { return node_; }
+  CG_STRONG_INLINE NodeBase const *operator->() const noexcept { return &node_; }
+  CG_STRONG_INLINE NodeBase *operator->() noexcept { return &node_; }
+  CG_STRONG_INLINE NodeBase &node() noexcept { return node_; }
+  CG_STRONG_INLINE NodeBase const &node() const noexcept { return node_; }
+  CG_STRONG_INLINE size_t index() const noexcept { return index_; }
   InputSocketHandle input(size_t index);
   OutputSocketHandle output(size_t index);
 
@@ -64,19 +64,21 @@ private:
 
 class InputSocketHandle {
 public:
-  InputSocket const &operator*() const noexcept {
+  CG_PP_HANDLE_COMMON(InputSocketHandle);
+
+  CG_STRONG_INLINE InputSocket const &operator*() const noexcept {
     return node_.inputs()[index_];
   }
-  InputSocket const *operator->() const noexcept {
+  CG_STRONG_INLINE InputSocket const *operator->() const noexcept {
     return &node_.inputs()[index_];
   }
 
-  NodeBase &node() noexcept { return node_; }
-  NodeBase const &node() const noexcept { return node_; }
-  size_t index() const noexcept { return index_; }
+  CG_STRONG_INLINE NodeBase &node() noexcept { return node_; }
+  CG_STRONG_INLINE NodeBase const &node() const noexcept { return node_; }
+  CG_STRONG_INLINE size_t index() const noexcept { return index_; }
 
 private:
-  InputSocketHandle(NodeBase &node, size_t index):
+  CG_STRONG_INLINE InputSocketHandle(NodeBase &node, size_t index):
       node_(node), index_(index) {}
 
   friend class Graph;
@@ -89,19 +91,21 @@ private:
 
 class OutputSocketHandle {
 public:
-  OutputSocket const &operator*() const noexcept {
+  CG_PP_HANDLE_COMMON(OutputSocketHandle);
+
+  CG_STRONG_INLINE OutputSocket const &operator*() const noexcept {
     return node_.outputs()[index_];
   }
-  OutputSocket const *operator->() const noexcept {
+  CG_STRONG_INLINE OutputSocket const *operator->() const noexcept {
     return &node_.outputs()[index_];
   }
 
-  NodeBase &node() noexcept { return node_; }
-  NodeBase const &node() const noexcept { return node_; }
-  size_t index() const noexcept { return index_; }
+  CG_STRONG_INLINE NodeBase &node() noexcept { return node_; }
+  CG_STRONG_INLINE NodeBase const &node() const noexcept { return node_; }
+  CG_STRONG_INLINE size_t index() const noexcept { return index_; }
 
 private:
-  OutputSocketHandle(NodeBase &node, size_t index):
+  CG_STRONG_INLINE OutputSocketHandle(NodeBase &node, size_t index):
       node_(node), index_(index) {}
 
   friend class Graph;
@@ -113,15 +117,17 @@ private:
 
 class Link {
 public:
-  OutputSocketHandle from() const noexcept {
+  CG_PP_HANDLE_COMMON(Link);
+
+  CG_STRONG_INLINE OutputSocketHandle from() const noexcept {
     return {from_, from_index_};
   }
-  InputSocketHandle to() const noexcept {
+  CG_STRONG_INLINE InputSocketHandle to() const noexcept {
     return {to_, to_index_};
   }
 
 private:
-  Link(NodeBase &from, size_t from_index, NodeBase &to, size_t to_index):
+  CG_STRONG_INLINE Link(NodeBase &from, size_t from_index, NodeBase &to, size_t to_index):
       from_(from), to_(to), from_index_(from_index), to_index_(to_index) {}
 
   friend class Graph;
@@ -143,11 +149,11 @@ public:
   Graph() = default;
   ~Graph() { clear(); }
   void clear();
-  size_t num_nodes() const noexcept { return nodes_.size() - free_ids_.size(); }
-  size_t num_links() const noexcept { return link_size_; }
+  CG_STRONG_INLINE size_t num_nodes() const noexcept { return nodes_.size() - free_ids_.size(); }
+  CG_STRONG_INLINE size_t num_links() const noexcept { return link_size_; }
 
-  node_container const &nodes() const noexcept { return nodes_; }
-  node_container &nodes() noexcept { return nodes_; }
+  CG_STRONG_INLINE node_container const &nodes() const noexcept { return nodes_; }
+  CG_STRONG_INLINE node_container &nodes() noexcept { return nodes_; }
 
   // node op.
   NodeHandle add(std::unique_ptr<NodeBase> node);
@@ -177,27 +183,27 @@ private:
 };
 
 
-inline bool can_connect(OutputSocket const &from, InputSocket const &to) noexcept {
+CG_STRONG_INLINE bool can_connect(OutputSocket const &from, InputSocket const &to) noexcept {
   return from.type() == to.type();
 }
 
-inline InputSocketHandle NodeHandle::input(size_t index) {
+CG_STRONG_INLINE InputSocketHandle NodeHandle::input(size_t index) {
   return {node_, index};
 }
 
-template<typename MT> InputSocketHandle NodeHandle::input(MT) {
+template<typename MT> CG_STRONG_INLINE InputSocketHandle NodeHandle::input(MT) {
   return input(MT::index);
 }
 
-inline OutputSocketHandle NodeHandle::output(size_t index) {
+CG_STRONG_INLINE OutputSocketHandle NodeHandle::output(size_t index) {
   return {node_, index};
 }
 
-template<typename MT> OutputSocketHandle NodeHandle::output(MT) {
+template<typename MT> CG_STRONG_INLINE OutputSocketHandle NodeHandle::output(MT) {
   return output(MT::index);
 }
 
-inline void Graph::clear() {
+CG_STRONG_INLINE void Graph::clear() {
   while (!nodes_.empty()) {
     if (nodes_.back()) {
       erase(NodeHandle{nodes_.size() - 1, *nodes_.back()});
@@ -212,7 +218,7 @@ inline void Graph::clear() {
   ctx_.clear();
 }
 
-inline NodeHandle Graph::add(std::unique_ptr<NodeBase> node) {
+CG_STRONG_INLINE NodeHandle Graph::add(std::unique_ptr<NodeBase> node) {
   if (free_ids_.empty()) {
     nodes_.push_back(std::move(node));
     addr_to_index_.insert({nodes_.back().get(), nodes_.size() - 1});
@@ -226,7 +232,7 @@ inline NodeHandle Graph::add(std::unique_ptr<NodeBase> node) {
   }
 }
 
-inline void Graph::erase(NodeHandle handle) {
+CG_STRONG_INLINE void Graph::erase(NodeHandle handle) {
   size_t const index = handle.index();
   for (size_t i = 0; i < handle->inputs().size(); ++i) {
     auto const &input_sock = handle->inputs()[i];
@@ -249,7 +255,7 @@ inline void Graph::erase(NodeHandle handle) {
   free_ids_.push_back(index);
 }
 
-inline Link Graph::connect(OutputSocketHandle from, InputSocketHandle to) {
+CG_STRONG_INLINE Link Graph::connect(OutputSocketHandle from, InputSocketHandle to) {
   if (!can_connect(*from, *to)) {
     throw std::invalid_argument("Cannot connect sockets of different types." + to_string(from->type()) + " and " + to_string(to->type()));
   }
@@ -270,11 +276,11 @@ inline Link Graph::connect(OutputSocketHandle from, InputSocketHandle to) {
   return Link{from_node, from.index(), to_node, to.index()};
 }
 
-inline bool Graph::has_connect(OutputSocketHandle from, InputSocketHandle to) const noexcept {
+CG_STRONG_INLINE bool Graph::has_connect(OutputSocketHandle from, InputSocketHandle to) const noexcept {
   return to->from() == from.operator->();
 }
 
-inline void Graph::erase(Link link) {
+CG_STRONG_INLINE void Graph::erase(Link link) {
   auto &from = link.from().node();
   auto &to = link.to().node();
   auto &from_sock = from.outputs_[link.from().index()];
@@ -287,11 +293,11 @@ inline void Graph::erase(Link link) {
 }
 
 
-inline bool Graph::has_cycle() const noexcept {
+CG_STRONG_INLINE bool Graph::has_cycle() const noexcept {
   return topology_order().empty();
 }
 
-inline void Graph::rebuild_addr_to_index() noexcept {
+CG_STRONG_INLINE void Graph::rebuild_addr_to_index() noexcept {
   addr_to_index_.clear();
   addr_to_index_.reserve(nodes_.size());
   for (size_t i = 0; i < nodes_.size(); ++i) {
@@ -299,7 +305,7 @@ inline void Graph::rebuild_addr_to_index() noexcept {
   }
 }
 
-inline void Graph::topology_sort() {
+CG_STRONG_INLINE void Graph::topology_sort() {
   auto const order = topology_order();
   node_container new_nodes;
   new_nodes.reserve(nodes_.size());
@@ -309,7 +315,7 @@ inline void Graph::topology_sort() {
   nodes_ = std::move(new_nodes);
 }
 
-inline std::vector<size_t> Graph::topology_order() const noexcept {
+CG_STRONG_INLINE std::vector<size_t> Graph::topology_order() const noexcept {
   std::vector<size_t> result;
   size_t const n = nodes_.size();
   result.reserve(n);
