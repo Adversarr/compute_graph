@@ -165,15 +165,17 @@ public:
         avoid_if_constexpr<has_default_value_v<meta>, void>::eval(index, data);
       }
     };
+    static constexpr size_t num_inputs = intern::count_socket_v<input_metas>;
+    static constexpr size_t num_outputs = intern::count_socket_v<output_metas>;
   };
 
-  static constexpr size_t num_inputs = intern::count_socket_v<typename intern_node_traits::input_metas>;
-  static constexpr size_t num_outputs = intern::count_socket_v<typename intern_node_traits::output_metas>;
 
   static CG_STRONG_INLINE NodeDescriptor build_descriptor() {
     NodeDescriptorBuilder<Derived> builder(Derived::name, Derived::description);
-    intern::static_for_eval<0, num_inputs, intern_node_traits::template input_reg_fn>(builder);
-    intern::static_for_eval<0, num_outputs, intern_node_traits::template output_reg_fn>(builder);
+    intern::static_for_eval<0, intern_node_traits::num_inputs,
+                            intern_node_traits::template input_reg_fn>(builder);
+    intern::static_for_eval<0, intern_node_traits::num_outputs,
+                            intern_node_traits::template output_reg_fn>(builder);
     intern::call_on_register_if_presented<Derived>::exec();
     return builder.build();
   }
@@ -181,7 +183,7 @@ public:
 
 protected:
   CG_STRONG_INLINE void on_connect(size_t index) noexcept override {
-    constexpr size_t total = num_inputs;
+    constexpr size_t total = intern_node_traits::num_inputs;
     intern::static_for_eval<0, total, intern_node_traits::template input_on_connect_fn>(
         index, *static_cast<Derived *>(this));
   }
@@ -227,13 +229,13 @@ protected:
   template <typename T, typename = std::enable_if_t<std::is_convertible_v<T, size_t>>>
   static CG_STRONG_INLINE void const* default_value(T index) CG_NOEXCEPT {
 #ifndef CG_NO_CHECK
-    if (index >= num_inputs) {
+    if (index >= intern_node_traits::num_inputs) {
       CG_THROW(std::out_of_range, "Input index out of range.");
     }
 #endif
     void const* data = nullptr;
     auto const ind = static_cast<size_t>(index);
-    intern::static_for_eval<0, num_inputs,
+    intern::static_for_eval<0, intern_node_traits::num_inputs,
               intern_node_traits::template input_default_value_fn>(ind, data);
     return data;
   }
@@ -245,7 +247,7 @@ protected:
   }
 
   template <size_t i> static CG_STRONG_INLINE auto const &default_value() noexcept {
-    static_assert(i < num_inputs, "Index out of range.");
+    static_assert(i < intern_node_traits::num_inputs, "Index out of range.");
     using MT = typename intern_node_traits::input_metas::template socket_meta<i>;
     return default_value<MT>({});
   }
@@ -265,12 +267,12 @@ private:
 
 protected:
   CG_STRONG_INLINE auto get_all() const {
-    return get_all(std::make_index_sequence<num_inputs>());
+    return get_all(std::make_index_sequence<intern_node_traits::num_inputs>());
   }
 
   template <typename ... Args>
   CG_STRONG_INLINE auto set_all(Args && ... args) {
-    return set_all_impl(std::make_index_sequence<num_outputs>(),
+    return set_all_impl(std::make_index_sequence<intern_node_traits::num_outputs>(),
                         std::tuple<Args&&...>(std::forward<Args>(args)...));
   }
 };
