@@ -39,7 +39,7 @@ public:
   CG_NODE_INPUTS((std::string, str, "Input string"));
   CG_NODE_OUTPUTS();
 
-  void on_connect(in::str_) /* automatically called. */ {
+  void on_connect_dispatch(in::str_) /* automatically called. */ {
     std::cout << "EchoString::on_connect" << std::endl;
     std::cout << " has input set? " << std::boolalpha << has(in::str) << std::endl;
   }

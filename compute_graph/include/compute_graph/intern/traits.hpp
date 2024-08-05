@@ -147,7 +147,7 @@ template <typename T> constexpr bool is_socket_meta_v = is_socket_meta<T>::value
 template <typename C, typename MT> struct has_on_connect_mt {
 private:
   template <typename T> static constexpr auto check(T *) ->
-      typename std::is_same<decltype(std::declval<T>().on_connect(std::declval<MT>())), void>::type;
+      typename std::is_same<decltype(std::declval<T>().on_connect_dispatch(std::declval<MT>())), void>::type;
 
   template <typename> static constexpr std::false_type check(...);
 
@@ -163,7 +163,7 @@ template <typename C, typename MT> static constexpr bool has_on_connect_mt_v
 template <typename C, typename MT, bool = has_on_connect_mt_v<C, MT>> struct call_on_connect_mt_if_presented;
 
 template <typename C, typename MT> struct call_on_connect_mt_if_presented<C, MT, true> {
-  static CG_STRONG_INLINE void exec(C &c, MT m) { c.on_connect(m); }
+  static CG_STRONG_INLINE void exec(C &c, MT m) { c.on_connect_dispatch(m); }
 };
 
 template <typename C, typename MT> struct call_on_connect_mt_if_presented<C, MT, false> {

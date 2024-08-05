@@ -276,10 +276,6 @@ protected:
       : NodeDerive<NodeType>(descriptor) {                                          \
     ::compute_graph::intern::call_on_construct_if_presented<NodeType>::exec(*this); \
   }                                                                                 \
-                                                                                    \
-protected:                                                                          \
-  using NodeDerive<NodeType>::on_connect;                                           \
-                                                                                    \
 public:                                                                             \
   friend class NodeDescriptorBuilder<NodeType>;                                     \
   static constexpr const char *name = Name;                                         \
