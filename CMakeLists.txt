@@ -20,7 +20,6 @@ endif()
 # ================ options ================
 option(CG_BUILD_EXAMPLES "Build examples" ${PROJECT_IS_TOP_LEVEL})
 
-
 # ================ target ================
 add_library(compute_graph INTERFACE)
 target_include_directories(compute_graph INTERFACE
@@ -38,27 +37,17 @@ endif()
 
 # ================ install ================
 include(GNUInstallDirs)
-include(CMakePackageConfigHelpers)
-set(version_config_file ${CMAKE_CURRENT_BINARY_DIR}/compute_graphConfigVersion.cmake)
-set(project_config_file ${CMAKE_CURRENT_BINARY_DIR}/compute_graphConfig.cmake)
-
-write_basic_package_version_file(
-    ${version_config_file}
-    VERSION ${PACKAGE_VERSION}
-    COMPATIBILITY AnyNewerVersion
-)
-
-install(DIRECTORY compute_graph/include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(TARGETS compute_graph
-        EXPORT  compute_graphTargets
-        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(EXPORT compute_graphTargets
-        FILE compute_graphTargets.cmake
-        NAMESPACE compute_graph::
+        EXPORT  compute_graphConfig)
+install(DIRECTORY compute_graph/include/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(EXPORT compute_graphConfig
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/compute_graph)
-install(FILES ${project_config_file} ${version_config_file}
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/compute_graph)
-
-configure_file(${CMAKE_CURRENT_LIST_DIR}/cmake/compute_graphConfig.cmake.in
-               ${project_config_file}
-               @ONLY)
+export(TARGETS compute_graph FILE compute_graphConfig.cmake)
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+        compute_graphConfigVersion.cmake
+        COMPATIBILITY AnyNewerVersion
+        ARCH_INDEPENDENT)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/compute_graphConfigVersion.cmake
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/compute_graph)

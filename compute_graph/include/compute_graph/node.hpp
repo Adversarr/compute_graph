@@ -30,7 +30,7 @@
 
 namespace compute_graph {
 
-class NodeBase {
+class NodeBase CG_NODE_INHERITANCE {
 public:
   CG_STRONG_INLINE explicit NodeBase(NodeDescriptor const &descriptor) noexcept
       : inputs_{}, outputs_{}, descriptor_(descriptor) {
@@ -47,7 +47,7 @@ public:
   }
 
   NodeBase(NodeBase const &) = delete;
-  NodeBase(NodeBase &&) = default;
+  NodeBase(NodeBase &&) noexcept = default;
   NodeBase &operator=(NodeBase const &) = delete;
   NodeBase &operator=(NodeBase &&) = delete;
 
@@ -69,31 +69,37 @@ public:
     return descriptor_.find_output(name);
   }
 
-  CG_NODE_EXTENSION
-
 protected:
   virtual void on_connect(size_t /*index*/) noexcept {}
 
-  CG_STRONG_INLINE TypeErasedPtr const &get_input(size_t index) const {
+  CG_STRONG_INLINE TypeErasedPtr const &get(size_t index) const {
+#ifndef CG_NO_CHECK
+    return inputs_.at(index).fetch_payload();
+#else
     return inputs_[index].fetch_payload();
+#endif
   }
 
   template <typename T>
-  CG_STRONG_INLINE auto const *get_input(size_t index) const {
+  CG_STRONG_INLINE T const *get(size_t index) const CG_NOEXCEPT {
 #ifndef CG_NO_CHECK
     if (inputs_[index].type() != typeid(T)) {
       CG_THROW(std::invalid_argument, "Type mismatch");
     }
 #endif
-    return static_cast<T const *>(get_input(index).get());
+    return static_cast<T const *>(get(index).get());
   }
 
-  CG_STRONG_INLINE bool has_input(size_t index) const noexcept {
+  CG_STRONG_INLINE bool has(size_t index) const noexcept {
+#ifndef CG_NO_CHECK
+    return !inputs_.at(index).is_empty();
+#else
     return !inputs_[index].is_empty();
+#endif
   }
 
   template <typename T, typename... Args>
-  CG_STRONG_INLINE auto &set_output(size_t index, Args &&...args) {
+  CG_STRONG_INLINE auto &set(size_t index, Args &&...args) {
     return outputs_[index].emplace<T>(std::forward<Args>(args)...);
   }
 
@@ -118,27 +124,47 @@ public:
     using input_metas = typename Derived::intern_input_meta;
     using output_metas = typename Derived::intern_output_meta;
     template <size_t i> struct input_reg_fn {
-      static CG_STRONG_INLINE void eval(NodeDescriptorBuilder<Derived> &builder) {
+      static CG_STRONG_INLINE void eval(NodeDescriptorBuilder<Derived> &builder) noexcept {
         using meta = typename input_metas::template socket_meta<i>;
         using T = typename meta::type;
-        builder.input(make_socket_descriptor<T>(meta::name, meta::description));
+        builder.input(make_socket_descriptor<T>(meta::name, meta::description, meta::pretty_typename));
       }
     };
 
     template <size_t i> struct output_reg_fn {
-      static CG_STRONG_INLINE void eval(NodeDescriptorBuilder<Derived> &builder) {
+      static CG_STRONG_INLINE void eval(NodeDescriptorBuilder<Derived> &builder) noexcept {
         using meta = typename output_metas::template socket_meta<i>;
         using T = typename meta::type;
-        builder.output(make_socket_descriptor<T>(meta::name, meta::description));
+        builder.output(make_socket_descriptor<T>(meta::name, meta::description, meta::pretty_typename));
       }
     };
 
     template <size_t i> struct input_on_connect_fn {
-      static CG_STRONG_INLINE void eval(size_t index, Derived &node) {
+      static CG_STRONG_INLINE void eval(size_t index, Derived &node) noexcept {
         using meta = typename input_metas::template socket_meta<i>;
         if (index == i) {
           intern::call_on_connect_mt_if_presented<Derived, meta>::exec(node, meta{});
         }
+      }
+    };
+
+    template <size_t i> struct input_default_value_fn {
+      template <bool enable, typename> struct avoid_if_constexpr {
+        CG_STRONG_INLINE static void eval(size_t, void const*&) {}
+      };
+
+      template <typename Dummy> struct avoid_if_constexpr<true, Dummy> {
+        CG_STRONG_INLINE static void eval(size_t index, void const*& data) {
+          using meta = typename input_metas::template socket_meta<i>;
+          if (index == i) {
+            data = &meta::default_value();
+          }
+        }
+      };
+
+      static CG_STRONG_INLINE void eval(size_t index, void const*& data) noexcept {
+        using meta = typename input_metas::template socket_meta<i>;
+        avoid_if_constexpr<has_default_value_v<meta>, void>::eval(index, data);
       }
     };
   };
@@ -156,22 +182,34 @@ public:
   }
 
 protected:
-  void on_connect(size_t index) noexcept override {
+  CG_STRONG_INLINE void on_connect(size_t index) noexcept override {
     constexpr size_t total = intern::count_socket_v<typename intern_node_traits::input_metas>;
     intern::static_for_eval<0, total, intern_node_traits::template input_on_connect_fn>(
         index, *static_cast<Derived *>(this));
   }
 
+  using NodeBase::set, NodeBase::has;
+
   template <typename MT, typename = std::enable_if_t<intern::is_socket_meta_v<MT>>>
-  CG_STRONG_INLINE auto const *get(MT) const {
+  CG_STRONG_INLINE auto const *get(MT) const noexcept {
     constexpr size_t index = MT::index;
-    return static_cast<typename MT::type const *>(get_input(index).get());
+    return static_cast<typename MT::type const *>(NodeBase::get(index).get());
+  }
+
+  template <typename T, typename = std::enable_if_t<!intern::is_socket_meta_v<T>>>
+  CG_STRONG_INLINE T const* get(size_t index) const {
+    return NodeBase::get<T>(index);
   }
 
   template <typename MT, typename = std::enable_if_t<intern::is_socket_meta_v<MT>>>
   CG_STRONG_INLINE auto const &get_or(MT) const {
     constexpr size_t index = MT::index;
-    return has_input(index) ? *get<MT>({}) : default_value<MT>({});
+    return has(index) ? *get<MT>({}) : default_value<MT>({});
+  }
+
+  template <typename T, typename = std::enable_if_t<!intern::is_socket_meta_v<T>>>
+  CG_STRONG_INLINE T const* get_or(size_t index) const {
+    return static_cast<T const*>(has(index) ? get<T>(index) : default_value(index));
   }
 
   template <typename MT, typename... Args,
@@ -179,7 +217,7 @@ protected:
   CG_STRONG_INLINE auto &set(MT, Args &&...args) {
     constexpr size_t index = MT::index;
     using T = typename MT::type;
-    return set_output<T>(index, std::forward<Args>(args)...);
+    return set<T>(index, std::forward<Args>(args)...);
   }
 
   template <typename MT, typename = std::enable_if_t<intern::is_socket_meta_v<MT>>>
@@ -188,33 +226,70 @@ protected:
     return MT::default_value();
   }
 
+  template <typename T, typename = std::enable_if_t<std::is_convertible_v<T, size_t>>>
+  static CG_STRONG_INLINE void const* default_value(T index) noexcept {
+    constexpr size_t total = intern::count_socket_v<typename intern_node_traits::input_metas>;
+#ifndef CG_NO_CHECK
+    if (index >= total) {
+      CG_THROW(std::out_of_range, "Input index out of range.");
+    }
+#endif
+    void const* data = nullptr;
+    auto const ind = static_cast<size_t>(index);
+    intern::static_for_eval<0, total,
+              intern_node_traits::template input_default_value_fn>(ind, data);
+    return data;
+  }
+
   template <typename MT, typename = std::enable_if_t<intern::is_socket_meta_v<MT>>>
   CG_STRONG_INLINE bool has(MT) const noexcept {
     constexpr size_t index = MT::index;
-    return has_input(index);
-  }
-
-  CG_STRONG_INLINE TypeErasedPtr const &get(size_t index) const { return get_input(index); }
-
-  template <typename T, typename... Args> CG_STRONG_INLINE auto &set(size_t index, Args &&...args) {
-    return set_output<T>(index, std::forward<Args>(args)...);
+    return has(index);
   }
 
   template <size_t i> static CG_STRONG_INLINE auto const &default_value() noexcept {
     using MT = typename intern_node_traits::input_metas::template socket_meta<i>;
     return default_value<MT>({});
   }
+
+private:
+  template <size_t ... Idx> auto get_all(std::index_sequence<Idx...>) const {
+    using inputs = typename intern_node_traits::input_metas;
+    return std::make_tuple(get<typename inputs::template socket_meta<Idx, int>>({})...);
+  }
+
+  template <typename ... Args, size_t ... Idx>
+  auto set_all_impl(std::index_sequence<Idx ...>, std::tuple<Args...> arg) {
+    using outputs = typename intern_node_traits::output_metas;
+    return std::make_tuple(set<typename outputs::template socket_meta<Idx, int>::type>(
+                           Idx, std::get<Idx>(arg)) ...);
+  }
+
+protected:
+  CG_STRONG_INLINE auto get_all() const {
+    constexpr size_t total = intern::count_socket_v<typename intern_node_traits::input_metas>;
+    return get_all(std::make_index_sequence<total>());
+  }
+
+  template <typename ... Args>
+  CG_STRONG_INLINE auto set_all(Args && ... args) {
+    constexpr size_t total = intern::count_socket_v<typename intern_node_traits::output_metas>;
+    return set_all_impl(std::make_index_sequence<total>(),
+                        std::tuple<Args&&...>(std::forward<Args>(args)...));
+  }
 };
+
 
 }  // namespace compute_graph
 
 // Helper macros to define a node.
 #define CG_NODE_SOCKET_IMPL(ith, Type, Name, desc, ...)              \
   template <typename _WHATEVER> struct socket_meta<ith, _WHATEVER>   \
-      : compute_graph::intern::socket_meta_base {                    \
+      : ::compute_graph::intern::socket_meta_base {                  \
     using type = Type;                                               \
     static constexpr size_t index = ith;                             \
     static constexpr const char *name = #Name;                       \
+    static constexpr const char *pretty_typename = #Type;                \
     static constexpr const char *description = desc;                 \
     __VA_OPT__(static CG_STRONG_INLINE Type const &default_value() { \
       static Type _v{__VA_ARGS__};                                   \

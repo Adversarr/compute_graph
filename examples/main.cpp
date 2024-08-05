@@ -12,7 +12,7 @@ public:
 
   void on_construct() /* optional */ { set(out::value, 5); }
 
-  void operator()(Graph &) final { set(out::value, 5); }
+  void operator()(Graph &) final { set_all(5); }
 };
 
 class WhateverNode : public NodeDerive<WhateverNode> {
@@ -28,7 +28,7 @@ public:
 
   void operator()(Graph &) final {
     auto x = get_or(in::x);
-    auto y = get_or(in::y);
+    auto y = *get_or<int>(1);
     set(out::z, "x=" + std::to_string(x) + ", y=" + std::to_string(y));
   }
 };
@@ -45,8 +45,20 @@ public:
   }
 
   void operator()(Graph &) final {
-    auto str = *get(in::str);
+    auto str = *get<std::string>(0);
     std::cout << "str: " << std::quoted(str) << std::endl;
+  }
+};
+
+class EchoInteger : public NodeDerive<EchoInteger> {
+public:
+  CG_NODE_COMMON(EchoInteger, "EchoInteger", "EchoIntegerDescription");
+  CG_NODE_INPUTS((int, x, "Input integer"));
+  CG_NODE_OUTPUTS();
+
+  void operator()(Graph &) final {
+    auto [x] = get_all();
+    std::cout << "x: " << *x << std::endl;
   }
 };
 
@@ -54,9 +66,11 @@ int main() {
   Graph g;
   auto nh1 = g.add(NodeRegistry::instance().create<WhateverNode>()),
        nh2 = g.add(NodeRegistry::instance().create<EchoString>()),
-       nh3 = g.add(NodeRegistry::instance().create<ConstIntegerNode>());
+       nh3 = g.add(NodeRegistry::instance().create<ConstIntegerNode>()),
+       nh4 = g.add(NodeRegistry::instance().create<EchoInteger>());
   g.connect(nh1.output(WhateverNode::out::z), nh2.input(EchoString::in::str));
   g.connect(nh3.output(ConstIntegerNode::out::value), nh1.input(WhateverNode::in::x));
+  g.connect(nh3.output(ConstIntegerNode::out::value), nh4.input(0));
   g.topology_sort();
 
   for (auto const &node : g.nodes()) {

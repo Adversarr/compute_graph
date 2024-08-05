@@ -27,7 +27,7 @@ namespace intern {
 
 template <size_t N, size_t Low, size_t High> struct static_for {
   template <template <size_t> typename Fn, typename... Args>
-  static CG_STRONG_INLINE void eval(Args &...args) {
+  static CG_STRONG_INLINE void eval(Args &&...args) {
     Fn<N>::eval(args...);
     static_for<N + 1, Low, High>().template eval<Fn>(args...);
   }
@@ -35,12 +35,12 @@ template <size_t N, size_t Low, size_t High> struct static_for {
 
 template <size_t N, size_t Low> struct static_for<N, Low, N> {
   template <template <size_t> typename Fn, typename... Args>
-  static CG_STRONG_INLINE void eval(Args &...) {}
+  static CG_STRONG_INLINE void eval(Args &&...) {}
 };
 
 template <size_t Low, size_t High, template <size_t> typename Fn, typename... Args>
-CG_STRONG_INLINE void static_for_eval(Args &...args) {
-  static_for<Low, Low, High>().template eval<Fn, Args...>(args...);
+CG_STRONG_INLINE void static_for_eval(Args &&...args) {
+  static_for<Low, Low, High>().template eval<Fn, Args...>(std::forward<Args>(args)...);
 }
 
 template <typename T> struct is_meta_valid {

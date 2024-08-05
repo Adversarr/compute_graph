@@ -28,10 +28,9 @@
 //   |  controls whether to use __forceinline or not, see below.              |
 //   |  Define this macro to disable __forceinline, otherwise just `inline`.  |
 //   +------------------------------------------------------------------------+
-//   CG_NODE_EXTENSION:-------------------------------------------------------+
-//   |  A control macro that can be defined to add extra code to the node     |
-//   |  class. This is useful for adding extra methods or members to the      |
-//   |  node class.                                                           |
+//   CG_NODE_SUPERBASE:-------------------------------------------------------+
+//   |  A control macro that can be defined to add extra inheritance to the   |
+//   |  node base.                                                            |
 //   +------------------------------------------------------------------------+
 //   CG_NO_EXCEPTION:---------------------------------------------------------+
 //   |  Controls whether to use exceptions or not.                            |
@@ -65,8 +64,10 @@
 #  endif
 #endif
 
-#ifndef CG_NODE_EXTENSION
-#  define CG_NODE_EXTENSION /* empty */
+#ifdef CG_NODE_SUPERBASE
+#  define CG_NODE_INHERITANCE : CG_NODE_SUPERBASE
+#else
+#  define CG_NODE_INHERITANCE
 #endif
 
 #ifdef CG_NO_CHECK

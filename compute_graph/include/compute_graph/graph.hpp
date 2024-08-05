@@ -24,7 +24,7 @@
 #include <memory>
 #include <vector>
 
-#include "compute_graph/socket.hpp"
+#include "socket.hpp"
 #include "intern/config.hpp"
 #include "node.hpp"
 
@@ -139,8 +139,8 @@ public:
   using node_addr_to_index_map = std::unordered_map<NodeBase const *, size_t>;
 
   Graph() = default;
-  ~Graph() { clear(); }
-  void clear();
+  ~Graph() noexcept { clear(); }
+  void clear() noexcept;
   CG_STRONG_INLINE size_t num_nodes() const noexcept { return nodes_.size() - free_ids_.size(); }
   CG_STRONG_INLINE size_t num_links() const noexcept { return link_size_; }
 
@@ -150,12 +150,12 @@ public:
   // node op.
   NodeHandle add(std::unique_ptr<NodeBase> node);
   std::optional<NodeHandle> get(NodeBase const *ptr) const noexcept;
-  void erase(NodeHandle handle);
+  void erase(NodeHandle handle) noexcept;
 
   // socket op
   Link connect(OutputSocketHandle from, InputSocketHandle to);
-  bool has_connect(OutputSocketHandle from, InputSocketHandle to) const noexcept;
-  void erase(Link link);
+  bool has_connect(OutputSocketHandle const& from, InputSocketHandle const& to) const noexcept;
+  void erase(Link link) noexcept;
 
   // context op
   ctx_type &ctx() noexcept { return ctx_; }
@@ -191,7 +191,7 @@ template <typename MT, typename> CG_STRONG_INLINE OutputSocketHandle NodeHandle:
   return output(MT::index);
 }
 
-CG_STRONG_INLINE void Graph::clear() {
+CG_STRONG_INLINE void Graph::clear() noexcept {
   while (!nodes_.empty()) {
     if (nodes_.back()) {
       erase(NodeHandle{nodes_.size() - 1, *nodes_.back()});
@@ -228,7 +228,7 @@ CG_STRONG_INLINE std::optional<NodeHandle> Graph::get(NodeBase const *ptr) const
   }
 }
 
-CG_STRONG_INLINE void Graph::erase(NodeHandle handle) {
+CG_STRONG_INLINE void Graph::erase(NodeHandle handle) noexcept {
   size_t const index = handle.index();
   for (size_t i = 0; i < handle->inputs().size(); ++i) {
     auto const &input_sock = handle->inputs()[i];
@@ -273,18 +273,17 @@ CG_STRONG_INLINE Link Graph::connect(OutputSocketHandle from, InputSocketHandle 
   return Link{from_node, from.index(), to_node, to.index()};
 }
 
-CG_STRONG_INLINE bool Graph::has_connect(OutputSocketHandle from,
-                                         InputSocketHandle to) const noexcept {
+CG_STRONG_INLINE bool Graph::has_connect(OutputSocketHandle const& from,
+                                         InputSocketHandle const& to) const noexcept {
   return to->from() == from.operator->();
 }
 
-CG_STRONG_INLINE void Graph::erase(Link link) {
+CG_STRONG_INLINE void Graph::erase(Link link) noexcept {
   auto &from = link.from().node();
   auto &to = link.to().node();
   auto &from_sock = from.outputs_[link.from().index()];
   auto &to_sock = to.inputs_[link.to().index()];
 
-  // TODO: callback.
   from_sock.erase(to_sock);
   to_sock.clear();
   --link_size_;

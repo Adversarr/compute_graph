@@ -32,7 +32,7 @@ using TypeErasedPtr = std::shared_ptr<void>;
 
 class OutputSocket {
 public:
-  template <typename T, typename... Args> T &emplace(Args &&...args) {
+  template <typename T, typename... Args> T &emplace(Args &&...args) CG_NOEXCEPT {
 #ifndef CG_NO_CHECK
     if (typeid(T) != type_) {
       CG_THROW(std::invalid_argument, "Type mismatch");
