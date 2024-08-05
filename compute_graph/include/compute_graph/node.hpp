@@ -119,8 +119,6 @@ public:
   ~NodeDerive() noexcept override = default;
 
   struct intern_node_traits {
-    static constexpr const char *name = Derived::name;
-    static constexpr const char *description = Derived::description;
     using input_metas = typename Derived::intern_input_meta;
     using output_metas = typename Derived::intern_output_meta;
     template <size_t i> struct input_reg_fn {
@@ -173,8 +171,7 @@ public:
   static constexpr size_t num_outputs = intern::count_socket_v<typename intern_node_traits::output_metas>;
 
   static CG_STRONG_INLINE NodeDescriptor build_descriptor() {
-    NodeDescriptorBuilder<Derived> builder(intern_node_traits::name,
-                                           intern_node_traits::description);
+    NodeDescriptorBuilder<Derived> builder(Derived::name, Derived::description);
     intern::static_for_eval<0, num_inputs, intern_node_traits::template input_reg_fn>(builder);
     intern::static_for_eval<0, num_outputs, intern_node_traits::template output_reg_fn>(builder);
     intern::call_on_register_if_presented<Derived>::exec();
