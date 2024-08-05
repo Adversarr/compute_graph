@@ -39,6 +39,7 @@ public:
     }
 #endif
     payload_ = std::make_shared<T>(std::forward<Args>(args)...);
+    dirty_ = true;
     return *static_cast<T*>(payload_.get());
   }
 
@@ -50,6 +51,9 @@ public:
   CG_STRONG_INLINE NodeBase &node() const noexcept { return node_; }
   CG_STRONG_INLINE void clear() noexcept { payload_.reset(); }
 
+  CG_STRONG_INLINE bool is_dirty() const noexcept { return dirty_; }
+  CG_STRONG_INLINE void mark_clean() noexcept { dirty_ = false; }
+
   CG_STRONG_INLINE OutputSocket(OutputSocket const &) = delete;
   CG_STRONG_INLINE OutputSocket(OutputSocket &&) noexcept = default;
   CG_STRONG_INLINE OutputSocket &operator=(OutputSocket const &) = delete;
@@ -57,7 +61,8 @@ public:
 
 private:
   CG_STRONG_INLINE OutputSocket(TypeIndex type, NodeBase &node, size_t index) noexcept
-      : type_(type), connected_sockets_{}, payload_{nullptr}, node_(node), index_(index) {}
+      : type_(type), connected_sockets_{}, payload_{nullptr},
+        dirty_(false), node_(node), index_(index) {}
 
   CG_STRONG_INLINE void erase(InputSocket const &to) noexcept {
     connected_sockets_.erase(std::remove_if(connected_sockets_.begin(), connected_sockets_.end(),
@@ -75,6 +80,7 @@ private:
   TypeIndex const type_;
   std::vector<InputSocket const *> connected_sockets_;
   TypeErasedPtr payload_;
+  bool dirty_;
   NodeBase &node_;
   size_t const index_;
 };
