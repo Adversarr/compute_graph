@@ -227,7 +227,7 @@ protected:
   }
 
   template <typename T, typename = std::enable_if_t<std::is_convertible_v<T, size_t>>>
-  static CG_STRONG_INLINE void const* default_value(T index) noexcept {
+  static CG_STRONG_INLINE void const* default_value(T index) CG_NOEXCEPT {
     constexpr size_t total = intern::count_socket_v<typename intern_node_traits::input_metas>;
 #ifndef CG_NO_CHECK
     if (index >= total) {
