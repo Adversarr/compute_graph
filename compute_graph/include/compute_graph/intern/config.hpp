@@ -122,14 +122,3 @@ CG_STRONG_INLINE std::string to_string(utype_ident ident) {
 }
 
 }  // namespace compute_graph
-
-template <> struct std::hash<compute_graph::utype_ident> {
-  CG_STRONG_INLINE std::size_t operator()(const compute_graph::utype_ident &id) const noexcept {
-    return std::visit(
-        [](auto &&arg) -> std::size_t {
-          using T = std::decay_t<decltype(arg)>;
-          return std::hash<T>{}(arg);
-        },
-        id);
-  }
-};

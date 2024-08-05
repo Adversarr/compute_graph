@@ -1,6 +1,5 @@
-#include <assert.h>
-
 #include <compute_graph/compute_graph.hpp>
+#include <cassert>
 #include <iomanip>
 #include <iostream>
 
@@ -60,6 +59,22 @@ int main() {
   assert(graph.has_connect(*c.output("value"), mul_abc.input(1)));
 
   graph.topology_sort();
+
+  for (auto const& [nt_ident, node_desc]: NodeRegistry::instance()) {
+    std::cout << "Node: " << node_desc.name() << " (type=" << to_string(nt_ident)
+              << ", hash=" << std::hash<utype_ident>{}(nt_ident) << ")" << std::endl;
+    std::cout << "  Description: " << node_desc.desc() << std::endl;
+    std::cout << "  Inputs:" << std::endl;
+    for (auto const& sock : node_desc.inputs()) {
+      std::cout << "    " << sock.name() << "(" << sock.pretty_typename() << "): " << sock.desc()
+                << std::endl;
+    }
+    std::cout << "  Outputs:" << std::endl;
+    for (auto const& sock : node_desc.outputs()) {
+      std::cout << "    " << sock.name() << "(" << sock.pretty_typename() << "): " << sock.desc()
+                << std::endl;
+    }
+  }
 
   for (auto & node : graph.nodes()) {
     (*node)(graph);
