@@ -26,14 +26,13 @@ namespace compute_graph {
 
 class SocketDescriptor {
 public:
-  CG_STRONG_INLINE SocketDescriptor(TypeIndex type, std::string name, std::string desc) noexcept
-    : type_(type), name_(std::move(name)),
-      desc_(std::move(desc)), pretty_typename_{} {}
+  CG_STRONG_INLINE SocketDescriptor(TypeIndex type, std::string_view name,
+                                    std::string_view desc) noexcept
+      : type_(type), name_(name), desc_(desc), pretty_typename_{} {}
 
-  CG_STRONG_INLINE SocketDescriptor(TypeIndex type, std::string name, std::string desc,
-                                    std::string pretty_typename) noexcept
-    : type_(type), name_(std::move(name)),
-      desc_(std::move(desc)), pretty_typename_(std::move(pretty_typename)) {}
+  CG_STRONG_INLINE SocketDescriptor(TypeIndex type, std::string_view name, std::string_view desc,
+                                    std::string_view pretty_typename) noexcept
+      : type_(type), name_(name), desc_(desc), pretty_typename_(pretty_typename) {}
   CG_STRONG_INLINE SocketDescriptor(SocketDescriptor const &) noexcept = default;
   CG_STRONG_INLINE SocketDescriptor(SocketDescriptor &&) noexcept = default;
 
@@ -50,15 +49,16 @@ private:
 };
 
 template <typename T>
-CG_STRONG_INLINE SocketDescriptor make_socket_descriptor(std::string name, std::string desc) {
-  return {typeid(T), std::move(name), std::move(desc)};
+CG_STRONG_INLINE SocketDescriptor make_socket_descriptor(std::string_view name,
+                                                         std::string_view desc) {
+  return {typeid(T), name, desc};
 }
 
 
 template <typename T>
-CG_STRONG_INLINE SocketDescriptor make_socket_descriptor(std::string name, std::string desc,
-                                                         std::string pretty_typename) {
-  return {typeid(T), std::move(name), std::move(desc), std::move(pretty_typename)};
+CG_STRONG_INLINE SocketDescriptor make_socket_descriptor(std::string_view name, std::string_view desc,
+                                                         std::string_view pretty_typename) {
+  return {typeid(T), name, desc, pretty_typename};
 }
 
 

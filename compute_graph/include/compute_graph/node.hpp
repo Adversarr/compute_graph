@@ -61,11 +61,11 @@ public:
   CG_STRONG_INLINE auto const &inputs() const noexcept { return inputs_; }
   CG_STRONG_INLINE auto const &outputs() const noexcept { return outputs_; }
 
-  std::optional<size_t> find_input(std::string const &name) const noexcept {
+  std::optional<size_t> find_input(std::string_view name) const noexcept {
     return descriptor_.find_input(name);
   }
 
-  std::optional<size_t> find_output(std::string const &name) const noexcept {
+  std::optional<size_t> find_output(std::string_view name) const noexcept {
     return descriptor_.find_output(name);
   }
 
@@ -169,21 +169,22 @@ public:
     };
   };
 
+  static constexpr size_t num_inputs = intern::count_socket_v<typename intern_node_traits::input_metas>;
+  static constexpr size_t num_outputs = intern::count_socket_v<typename intern_node_traits::output_metas>;
+
   static CG_STRONG_INLINE NodeDescriptor build_descriptor() {
     NodeDescriptorBuilder<Derived> builder(intern_node_traits::name,
                                            intern_node_traits::description);
-    intern::static_for_eval<0, intern::count_socket_v<typename intern_node_traits::input_metas>,
-                            intern_node_traits::template input_reg_fn>(builder);
-    intern::static_for_eval<0, intern::count_socket_v<typename intern_node_traits::output_metas>,
-                            intern_node_traits::template output_reg_fn>(builder);
-
+    intern::static_for_eval<0, num_inputs, intern_node_traits::template input_reg_fn>(builder);
+    intern::static_for_eval<0, num_outputs, intern_node_traits::template output_reg_fn>(builder);
     intern::call_on_register_if_presented<Derived>::exec();
     return builder.build();
   }
 
+
 protected:
   CG_STRONG_INLINE void on_connect(size_t index) noexcept override {
-    constexpr size_t total = intern::count_socket_v<typename intern_node_traits::input_metas>;
+    constexpr size_t total = num_inputs;
     intern::static_for_eval<0, total, intern_node_traits::template input_on_connect_fn>(
         index, *static_cast<Derived *>(this));
   }
@@ -228,15 +229,14 @@ protected:
 
   template <typename T, typename = std::enable_if_t<std::is_convertible_v<T, size_t>>>
   static CG_STRONG_INLINE void const* default_value(T index) CG_NOEXCEPT {
-    constexpr size_t total = intern::count_socket_v<typename intern_node_traits::input_metas>;
 #ifndef CG_NO_CHECK
-    if (index >= total) {
+    if (index >= num_inputs) {
       CG_THROW(std::out_of_range, "Input index out of range.");
     }
 #endif
     void const* data = nullptr;
     auto const ind = static_cast<size_t>(index);
-    intern::static_for_eval<0, total,
+    intern::static_for_eval<0, num_inputs,
               intern_node_traits::template input_default_value_fn>(ind, data);
     return data;
   }
@@ -248,6 +248,7 @@ protected:
   }
 
   template <size_t i> static CG_STRONG_INLINE auto const &default_value() noexcept {
+    static_assert(i < num_inputs, "Index out of range.");
     using MT = typename intern_node_traits::input_metas::template socket_meta<i>;
     return default_value<MT>({});
   }
@@ -267,14 +268,12 @@ private:
 
 protected:
   CG_STRONG_INLINE auto get_all() const {
-    constexpr size_t total = intern::count_socket_v<typename intern_node_traits::input_metas>;
-    return get_all(std::make_index_sequence<total>());
+    return get_all(std::make_index_sequence<num_inputs>());
   }
 
   template <typename ... Args>
   CG_STRONG_INLINE auto set_all(Args && ... args) {
-    constexpr size_t total = intern::count_socket_v<typename intern_node_traits::output_metas>;
-    return set_all_impl(std::make_index_sequence<total>(),
+    return set_all_impl(std::make_index_sequence<num_outputs>(),
                         std::tuple<Args&&...>(std::forward<Args>(args)...));
   }
 };
@@ -289,7 +288,7 @@ protected:
     using type = Type;                                               \
     static constexpr size_t index = ith;                             \
     static constexpr const char *name = #Name;                       \
-    static constexpr const char *pretty_typename = #Type;                \
+    static constexpr const char *pretty_typename = #Type;            \
     static constexpr const char *description = desc;                 \
     __VA_OPT__(static CG_STRONG_INLINE Type const &default_value() { \
       static Type _v{__VA_ARGS__};                                   \

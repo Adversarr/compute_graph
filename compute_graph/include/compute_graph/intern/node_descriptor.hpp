@@ -47,7 +47,7 @@ public:
 
   CG_STRONG_INLINE utype_ident const &type() const noexcept { return type_; }
 
-  CG_STRONG_INLINE std::optional<size_t> find_input(std::string const &name) const noexcept {
+  CG_STRONG_INLINE std::optional<size_t> find_input(std::string_view name) const noexcept {
     for (size_t i = 0; i < inputs_.size(); ++i) {
       if (inputs_[i].name() == name) {
         return i;
@@ -56,7 +56,7 @@ public:
     return std::nullopt;
   }
 
-  CG_STRONG_INLINE std::optional<size_t> find_output(std::string const &name) const noexcept {
+  CG_STRONG_INLINE std::optional<size_t> find_output(std::string_view name) const noexcept {
     for (size_t i = 0; i < outputs_.size(); ++i) {
       if (outputs_[i].name() == name) {
         return i;
@@ -72,10 +72,10 @@ public:
   template <typename NodeType> friend class NodeDescriptorBuilder;
 
 private:
-  CG_STRONG_INLINE NodeDescriptor(std::string name, std::string desc, utype_ident type,
+  CG_STRONG_INLINE NodeDescriptor(std::string_view name, std::string_view desc, utype_ident type,
                                   NodeFactory factory) noexcept
-      : name_(std::move(name)),
-        desc_(std::move(desc)),
+      : name_(name),
+        desc_(desc),
         type_(std::move(type)),
         factory_(std::move(factory)),
         inputs_{},

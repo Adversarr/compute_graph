@@ -1,3 +1,5 @@
+#include <assert.h>
+
 #include <compute_graph/compute_graph.hpp>
 #include <iomanip>
 #include <iostream>
@@ -54,6 +56,8 @@ int main() {
   graph.connect(b.output(ConstantInteger::out::value), add_ab.input(Add::in::b));
   graph.connect(add_ab.output(Add::out::result), mul_abc.input(Mul::in::a));
   graph.connect(c.output(ConstantInteger::out::value), mul_abc.input(Mul::in::b));
+
+  assert(graph.has_connect(*c.output("value"), mul_abc.input(1)));
 
   graph.topology_sort();
 

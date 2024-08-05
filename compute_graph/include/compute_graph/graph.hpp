@@ -49,6 +49,10 @@ public:
   CG_STRONG_INLINE NodeBase &node() noexcept { return node_; }
   CG_STRONG_INLINE NodeBase const &node() const noexcept { return node_; }
   CG_STRONG_INLINE size_t index() const noexcept { return index_; }
+
+  std::optional<InputSocketHandle> input(std::string_view name) noexcept;
+  std::optional<OutputSocketHandle> output(std::string_view name) noexcept;
+
   InputSocketHandle input(size_t index);
   OutputSocketHandle output(size_t index);
 
@@ -117,17 +121,16 @@ private:
 class Link {
 public:
   CG_PP_HANDLE_COMMON(Link);
-
-  CG_STRONG_INLINE OutputSocketHandle from() const noexcept { return {from_, from_index_}; }
-  CG_STRONG_INLINE InputSocketHandle to() const noexcept { return {to_, to_index_}; }
+  CG_STRONG_INLINE OutputSocketHandle const& from() const noexcept { return from_; }
+  CG_STRONG_INLINE InputSocketHandle const& to() const noexcept { return to_; }
 
 private:
-  CG_STRONG_INLINE Link(NodeBase &from, size_t from_index, NodeBase &to, size_t to_index)
-      : from_(from), to_(to), from_index_(from_index), to_index_(to_index) {}
+  CG_STRONG_INLINE Link(OutputSocketHandle from, InputSocketHandle to) noexcept
+      : from_(from), to_(to) {}
 
   friend class Graph;
-  NodeBase &from_, &to_;
-  size_t const from_index_, to_index_;
+  OutputSocketHandle from_;
+  InputSocketHandle to_;
 };
 
 class Graph {
@@ -177,6 +180,24 @@ private:
 
 CG_STRONG_INLINE bool can_connect(OutputSocket const &from, InputSocket const &to) noexcept {
   return from.type() == to.type();
+}
+
+CG_STRONG_INLINE std::optional<InputSocketHandle> NodeHandle::input(
+    std::string_view name) noexcept {
+  if (auto const index = node_.find_input(name)) {
+    return input(*index);
+  } else {
+    return std::nullopt;
+  }
+}
+
+CG_STRONG_INLINE std::optional<OutputSocketHandle> NodeHandle::output(
+    std::string_view name) noexcept {
+  if (const auto index = node_.find_output(name)) {
+    return output(*index);
+  } else {
+    return std::nullopt;
+  }
 }
 
 CG_STRONG_INLINE InputSocketHandle NodeHandle::input(size_t index) { return {node_, index}; }
@@ -234,14 +255,14 @@ CG_STRONG_INLINE void Graph::erase(NodeHandle handle) noexcept {
     auto const &input_sock = handle->inputs()[i];
     if (input_sock.is_connected()) {
       auto const &output_sock = *input_sock.from();
-      erase(Link{output_sock.node(), output_sock.index(), handle.node(), i});
+      erase(Link{{output_sock.node(), output_sock.index()}, {handle.node(), i}});
     }
   }
 
   for (size_t i = 0; i < handle->outputs().size(); ++i) {
     auto const &output_sock = handle->outputs()[i];
     for (auto const &input_sock : output_sock.connected_sockets()) {
-      erase(Link{handle.node(), i, input_sock->node(), input_sock->index()});
+      erase(Link{{handle.node(), i}, {input_sock->node(), input_sock->index()}});
     }
   }
 
@@ -260,7 +281,7 @@ CG_STRONG_INLINE Link Graph::connect(OutputSocketHandle from, InputSocketHandle 
   // If already connected, erase the old link.
   if (to->is_connected()) {
     OutputSocket const *previous_from = to->from();
-    erase(Link{previous_from->node(), previous_from->index(), to->node(), to->index()});
+    erase(Link{{previous_from->node(), previous_from->index()}, {to->node(), to->index()}});
   }
 
   // add link in between.
@@ -270,7 +291,7 @@ CG_STRONG_INLINE Link Graph::connect(OutputSocketHandle from, InputSocketHandle 
   ++link_size_;
 
   to->node().on_connect(to.index());
-  return Link{from_node, from.index(), to_node, to.index()};
+  return Link{{from_node, from.index()}, {to_node, to.index()}};
 }
 
 CG_STRONG_INLINE bool Graph::has_connect(OutputSocketHandle const& from,
@@ -279,8 +300,8 @@ CG_STRONG_INLINE bool Graph::has_connect(OutputSocketHandle const& from,
 }
 
 CG_STRONG_INLINE void Graph::erase(Link link) noexcept {
-  auto &from = link.from().node();
-  auto &to = link.to().node();
+  auto &from = link.from_.node_;
+  auto &to = link.to_.node_;
   auto &from_sock = from.outputs_[link.from().index()];
   auto &to_sock = to.inputs_[link.to().index()];
 
