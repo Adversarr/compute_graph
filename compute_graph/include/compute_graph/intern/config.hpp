@@ -84,6 +84,16 @@
 #  endif
 #endif
 
+#ifdef __clang__
+#  define CG_UNREACHABLE() __builtin_unreachable()
+#elif defined(__GNUC__)
+#  define CG_UNREACHABLE() __builtin_unreachable()
+#elif defined(_MSC_VER)
+#  define CG_UNREACHABLE() __assume(0)
+#else
+#  define CG_UNREACHABLE() abort()
+#endif
+
 #if __cplusplus >= 201703L
 #  define CG_CONSTEXPR constexpr
 #else
@@ -100,8 +110,8 @@ class SocketDescriptor;  // Describe a socket on a node.
 class NodeBase;      // Base type for each node.
 class InputSocket;   // a socket on a node.
 class OutputSocket;  // a socket on a node.
-class Link;          // one connection between two sockets.
 class Graph;         // the context of the graph.
+class Context;       // the context of node runtime.
 
 using TypeIndex = std::type_index;
 using utype_ident = std::variant<std::string, TypeIndex>;

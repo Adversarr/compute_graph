@@ -16,7 +16,7 @@ public:
     set(out::value, value_);
   }
 
-  void operator() (Graph& ) final { on_construct(); }
+  void operator() (Context& ) final { on_construct(); }
 
   int value_ = 4;
 };
@@ -27,7 +27,7 @@ public:
       CG_NODE_COMMON(name, #name, "Binary operation " #op);\
       CG_NODE_INPUTS((int, a, "The first operand", 0), (int, b, "The second operand", 0)); \
       CG_NODE_OUTPUTS((int, result, "The result of " #op)); \
-      void operator() (Graph& ) final { set(out::result, get_or(in::a) op get_or(in::b)); } \
+      void operator() (Context& ) final { set(out::result, get_or(in::a) op get_or(in::b)); } \
   }
 
 DECLARE_BINARY_OP(Add, +);
@@ -35,7 +35,7 @@ DECLARE_BINARY_OP(Sub, -);
 DECLARE_BINARY_OP(Mul, *);
 DECLARE_BINARY_OP(Div, /);
 
-template <typename T> auto create_node() { return NodeRegistry::instance().create(typeid(T)); }
+template <typename T> auto create_node() { return NodeRegistry::instance().create<T>(); }
 
 int main() {
   Graph graph;
@@ -45,11 +45,8 @@ int main() {
   auto a = graph.add(create_node<ConstantInteger>()),
        b = graph.add(create_node<ConstantInteger>()),
        c = graph.add(create_node<ConstantInteger>());
-  auto set_value = [] (NodeHandle & nh, int val) {
-    dynamic_cast<ConstantInteger&>(nh.node()).value_ = val;
-  };
-  set_value(a, 1);
-  set_value(b, 2);
+  a->value_ = 1;
+  b->value_ = 2;
 
   graph.connect(a.output(0), add_ab.input(0));
   graph.connect(b.output(ConstantInteger::out::value), add_ab.input(Add::in::b));
@@ -76,8 +73,9 @@ int main() {
     }
   }
 
+  Context rt;
   for (auto & node : graph.nodes()) {
-    (*node)(graph);
+    (*node)(rt);
   }
 
   void const* result = mul_abc.output(Mul::out::result)->payload().get();

@@ -137,8 +137,8 @@ public:
     return it->second.build();
   }
 
-  template <typename T> std::unique_ptr<NodeBase> create() const CG_NOEXCEPT {
-    return create(typeid(T));
+  template <typename T> std::unique_ptr<T> create() const CG_NOEXCEPT {
+    return std::unique_ptr<T>(static_cast<T *>(create(typeid(T)).release()));
   }
 
   CG_STRONG_INLINE bool has(utype_ident type) const noexcept {

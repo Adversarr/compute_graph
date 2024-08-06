@@ -54,7 +54,7 @@ public:
   virtual ~NodeBase() noexcept = default;
 
   // execute, may throw exception.
-  virtual void operator()(Graph &) = 0;
+  virtual void operator()(Context &) = 0;
 
   CG_STRONG_INLINE NodeDescriptor const &descriptor() const noexcept { return descriptor_; }
 
@@ -103,10 +103,11 @@ protected:
     return outputs_[index].emplace<T>(std::forward<Args>(args)...);
   }
 
-private:
-  friend class Graph;
   std::vector<InputSocket> inputs_;
   std::vector<OutputSocket> outputs_;
+
+private:
+  friend class Graph;
   NodeDescriptor const & descriptor_;
 };
 
@@ -275,6 +276,9 @@ protected:
     return set_all_impl(std::make_index_sequence<intern_node_traits::num_outputs>(),
                         std::tuple<Args&&...>(std::forward<Args>(args)...));
   }
+
+private:
+  using NodeBase::inputs_, NodeBase::outputs_;
 };
 
 

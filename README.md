@@ -24,7 +24,7 @@ public:
   CG_NODE_INPUTS();
   CG_NODE_OUTPUTS((int, value, "The constant integer value"));
 
-  void operator()(Graph &) final {
+  void operator()(Context &) final {
     set(out::value, 5);
   }
 };
@@ -40,7 +40,7 @@ public:
     std::cout << "Do whatever you want!" << std::endl;
   }
 
-  void operator()(Graph &) final {
+  void operator()(Context &) final {
     auto x = get_or(in::x);
     auto y = get_or(in::y);
     set(out::z, "x=" + std::to_string(x) + ", y=" + std::to_string(y));
@@ -53,7 +53,7 @@ public:
   CG_NODE_INPUTS((std::string, str, "Input string"));
   CG_NODE_OUTPUTS();
 
-  void operator()(Graph &) final {
+  void operator()(Context &) final {
     auto str = *get(in::str);
     std::cout << "str: " << std::quoted(str) << std::endl;
   }
