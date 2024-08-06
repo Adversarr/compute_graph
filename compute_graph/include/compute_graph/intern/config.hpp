@@ -32,6 +32,10 @@
 //   |  A control macro that can be defined to add extra inheritance to the   |
 //   |  node base.                                                            |
 //   +------------------------------------------------------------------------+
+//   CG_NODE_EXTENSION:-------------------------------------------------------+
+//   |  A control macro that can be defined to add extra members to the node  |
+//   |  class. (public)                                                       |
+//   +------------------------------------------------------------------------+
 //   CG_NO_EXCEPTION:---------------------------------------------------------+
 //   |  Controls whether to use exceptions or not.                            |
 //   |  Define this macro to disable exceptions, and check failures will      |
@@ -68,6 +72,10 @@
 #  define CG_NODE_INHERITANCE : CG_NODE_SUPERBASE
 #else
 #  define CG_NODE_INHERITANCE
+#endif
+
+#ifndef CG_NODE_EXTENSION
+#  define CG_NODE_EXTENSION /* empty */
 #endif
 
 #ifdef CG_NO_CHECK

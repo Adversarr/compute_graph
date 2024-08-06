@@ -69,6 +69,8 @@ public:
     return descriptor_.find_output(name);
   }
 
+  CG_NODE_EXTENSION
+
 protected:
   virtual void on_connect(size_t /*index*/) noexcept {}
 

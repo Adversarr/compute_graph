@@ -95,8 +95,9 @@ private:
 class InputSocket {
 public:
   CG_STRONG_INLINE TypeIndex const &type() const noexcept { return type_; }
-  CG_STRONG_INLINE TypeErasedPtr const &fetch_payload() const noexcept { return from_->payload(); }
-
+  CG_STRONG_INLINE TypeErasedPtr const &fetch_payload() const noexcept {
+    return static_cast<OutputSocket const *>(from_)->payload();
+  }
   CG_STRONG_INLINE bool is_connected() const noexcept { return from_ != nullptr; }
   CG_STRONG_INLINE bool is_empty() const noexcept {
     return !is_connected() || !static_cast<bool>(fetch_payload());
@@ -122,7 +123,7 @@ private:
   const TypeIndex type_;
   NodeBase &node_;
   size_t const index_;
-  OutputSocket const *from_;
+  OutputSocket const*from_;
 };
 
 }  // namespace compute_graph

@@ -21,3 +21,4 @@ endmacro()
 
 cg_executable(compute_graph_exec main.cpp)
 cg_executable(calc calc.cpp)
+cg_executable(autodiff autodiff.cpp)
