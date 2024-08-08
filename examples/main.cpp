@@ -1,4 +1,5 @@
 #include <compute_graph/compute_graph.hpp>
+#include <compute_graph/extra/ctx_nodes.hpp>
 #include <iomanip>
 #include <iostream>
 
@@ -62,19 +63,43 @@ public:
   }
 };
 
+class ConstantString : public NodeDerive<ConstantString> {
+public:
+  CG_NODE_COMMON(ConstantString, "ConstantString", "ConstantString");
+  CG_NODE_INPUTS();
+  CG_NODE_OUTPUTS((std::string, value, "Return 'what'"));
+
+  void operator()(Context &) final {
+    set(out::value, "what");
+  }
+};
+namespace compute_graph {
+
+template class ReadContext<std::string>;
+
+}
+
 int main() {
   Graph g;
   NodeHandle<NodeBase>
        nh1 = g.add(NodeRegistry::instance().create<WhateverNode>()),
        nh2 = g.add(NodeRegistry::instance().create<EchoString>()),
        nh3 = g.add(NodeRegistry::instance().create<ConstIntegerNode>()),
-       nh4 = g.add(NodeRegistry::instance().create<EchoInteger>());
+       nh4 = g.add(NodeRegistry::instance().create<EchoInteger>()),
+       nh5 = g.add(NodeRegistry::instance().create<ConstantString>()),
+       nh6 = g.add(NodeRegistry::instance().create<ReadContext<std::string>>()),
+       nh7 = g.add(NodeRegistry::instance().create<EchoString>());
   g.connect(nh1.output(WhateverNode::out::z), nh2.input(EchoString::in::str));
   g.connect(nh3.output(ConstIntegerNode::out::value), nh1.input("x").value());
   g.connect(nh3.output(ConstIntegerNode::out::value), nh4.input(0));
+
+  g.connect(nh5.output(ConstantString::out::value), nh6.input("key").value());
+  g.connect(nh6.output(0), nh7.input(0));
+
   g.topology_sort();
 
   Context rt;
+  rt.insert("what", std::string("is?"));
 
   for (auto const &node : g.nodes()) {
     (*node)(rt);

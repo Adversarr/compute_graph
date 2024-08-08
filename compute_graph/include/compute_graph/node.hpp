@@ -32,17 +32,12 @@ namespace compute_graph {
 
 class NodeBase CG_NODE_INHERITANCE {
 public:
-  CG_STRONG_INLINE explicit NodeBase(NodeDescriptor const &descriptor) noexcept
+
+  CG_STRONG_INLINE explicit NodeBase(NodeDescriptor const &descriptor,
+                                     bool do_prepare = true) noexcept
       : inputs_{}, outputs_{}, descriptor_(descriptor) {
-    inputs_.reserve(descriptor.inputs().size());
-    outputs_.reserve(descriptor.outputs().size());
-
-    for (size_t i = 0; i < descriptor.inputs().size(); ++i) {
-      inputs_.push_back({descriptor.inputs()[i].type(), *this, i});
-    }
-
-    for (size_t i = 0; i < descriptor.outputs().size(); ++i) {
-      outputs_.push_back({descriptor.outputs()[i].type(), *this, i});
+    if (do_prepare) {
+      prepare_sockets(descriptor);
     }
   }
 
@@ -103,6 +98,19 @@ protected:
   template <typename T, typename... Args>
   CG_STRONG_INLINE auto &set(size_t index, Args &&...args) {
     return outputs_[index].emplace<T>(std::forward<Args>(args)...);
+  }
+
+  CG_STRONG_INLINE void prepare_sockets(NodeDescriptor const &descriptor) {
+    inputs_.reserve(descriptor.inputs().size());
+    outputs_.reserve(descriptor.outputs().size());
+
+    for (size_t i = 0; i < descriptor.inputs().size(); ++i) {
+      inputs_.push_back({descriptor.inputs()[i].type(), *this, i});
+    }
+
+    for (size_t i = 0; i < descriptor.outputs().size(); ++i) {
+      outputs_.push_back({descriptor.outputs()[i].type(), *this, i});
+    }
   }
 
   std::vector<InputSocket> inputs_;
@@ -199,6 +207,17 @@ protected:
     return static_cast<typename MT::type const *>(NodeBase::get(index).get());
   }
 
+  template <typename MT, typename = std::enable_if_t<intern::is_socket_meta_v<MT>>>
+  CG_STRONG_INLINE auto const &ensure(MT) const noexcept {
+    constexpr size_t index = MT::index;
+    using T = typename MT::type;
+    if (T const* ptr = get<MT>({})) {
+      return *ptr;
+    } else {
+      CG_THROW(std::runtime_error, "Socket not connected.");
+    }
+  }
+
   template <typename T, typename = std::enable_if_t<!intern::is_socket_meta_v<T>>>
   CG_STRONG_INLINE T const* get(size_t index) const {
     return NodeBase::get<T>(index);
@@ -256,7 +275,7 @@ protected:
   }
 
 private:
-  template <size_t ... Idx> auto get_all(std::index_sequence<Idx...>) const {
+  template <size_t ... Idx> auto get_all_impl(std::index_sequence<Idx...>) const {
     using inputs = typename intern_node_traits::input_metas;
     return std::make_tuple(get<typename inputs::template socket_meta<Idx, int>>({})...);
   }
@@ -270,7 +289,7 @@ private:
 
 protected:
   CG_STRONG_INLINE auto get_all() const {
-    return get_all(std::make_index_sequence<intern_node_traits::num_inputs>());
+    return get_all_impl(std::make_index_sequence<intern_node_traits::num_inputs>());
   }
 
   template <typename ... Args>
@@ -300,8 +319,8 @@ private:
       return _v;                                                     \
     })                                                               \
   };                                                                 \
-  using Name##_ = socket_meta<ith, int>;                             \
-  static constexpr Name##_ Name{};
+  using Name## _ = socket_meta<ith, int>;                             \
+  static constexpr Name## _ Name{};
 
 #define CG_NODE_PP_ADAPTOR(x, i) \
   CG_PP_EVAL(CG_NODE_SOCKET_IMPL CG_PP_EMPTY()(i, CG_PP_TUPLE_UNPACK x))
@@ -350,13 +369,18 @@ private:
 #endif
 
 // Use to define a node.
-#define CG_NODE_COMMON(NodeType, Name, Desc)                                        \
-  CG_STRONG_INLINE explicit NodeType(NodeDescriptor const &descriptor) noexcept     \
-      : NodeDerive<NodeType>(descriptor) {                                          \
-    ::compute_graph::intern::call_on_construct_if_presented<NodeType>::exec(*this); \
-  }                                                                                 \
-public:                                                                             \
-  friend class NodeDescriptorBuilder<NodeType>;                                     \
-  static constexpr const char *name = Name;                                         \
-  static constexpr const char *description = Desc;                                  \
-  CG_NODE_REGISTER_BODY(NodeType)
+#define CG_NODE_COMMON(NodeType, Name, Desc)                                                   \
+  CG_STRONG_INLINE explicit NodeType(NodeDescriptor const &descriptor) noexcept                \
+      : NodeDerive<NodeType>(descriptor) {                                                     \
+    ::compute_graph::intern::call_on_construct_if_presented<NodeType>::exec(*this);            \
+  }                                                                                            \
+                                                                                               \
+public:                                                                                        \
+  friend class NodeDescriptorBuilder<NodeType>;                                                \
+  static constexpr const char *name = Name;                                                    \
+  static constexpr const char *description = Desc;                                             \
+  CG_NODE_REGISTER_BODY(NodeType);                                                             \
+  using NodeDerive<NodeType>::get_or, NodeDerive<NodeType>::get, NodeDerive<NodeType>::has,    \
+      NodeDerive<NodeType>::set, NodeDerive<NodeType>::get_all, NodeDerive<NodeType>::set_all, \
+      NodeDerive<NodeType>::default_value, NodeDerive<NodeType>::ensure
+

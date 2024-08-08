@@ -55,8 +55,11 @@ public:
   template <typename T, typename... Args> auto emplace(std::string_view key, Args&&... args);
 
   // Get a value from the current frame.
-  std::any const& get(std::string_view key) const CG_NOEXCEPT;
-  std::any const& get_top(std::string_view key) const CG_NOEXCEPT;
+  std::any const& get(std::string const& key) const CG_NOEXCEPT;
+  std::any const& get_top(std::string const& key) const CG_NOEXCEPT;
+
+  bool has(std::string const& key) const noexcept;
+  bool has_top(std::string const& key) const noexcept;
 
 private:
   stacked_frames frames_;
@@ -88,20 +91,30 @@ CG_STRONG_INLINE auto Context::insert(std::string_view key, std::any const& valu
   return top().emplace(key, value);
 }
 
-CG_STRONG_INLINE std::any const& Context::get(std::string_view key) const CG_NOEXCEPT {
-  std::string const key_str{key};
+CG_STRONG_INLINE std::any const& Context::get(std::string const& key) const CG_NOEXCEPT {
   for (auto it = frames_.crbegin(); it != frames_.crend(); ++it) {
-    if (auto const& it2 = it->find(key_str); it2 != it->end()) return it2->second;
+    if (auto const& it2 = it->find(key); it2 != it->end()) return it2->second;
   }
   CG_THROW(std::out_of_range, "Key not found in context: " + std::string(key));
   CG_UNREACHABLE();
 }
 
-inline std::any const& Context::get_top(std::string_view key) const CG_NOEXCEPT {
-  std::string const key_str{key};
-  if (auto const& it = top().find(key_str); it != top().end()) return it->second;
+inline std::any const& Context::get_top(std::string const& key) const CG_NOEXCEPT {
+  if (auto const& it = top().find(key); it != top().end()) return it->second;
   CG_THROW(std::out_of_range, "Key not found in context: " + std::string(key));
   CG_UNREACHABLE();
+}
+
+CG_STRONG_INLINE bool Context::has(std::string const& key) const noexcept{
+  for (auto it = frames_.crbegin(); it != frames_.crend(); ++it) {
+    if (auto const& it2 = it->find(key); it2 != it->end()) return true;
+  }
+  return false;
+}
+
+CG_STRONG_INLINE bool Context::has_top(std::string const& key) const noexcept{
+  auto const& it = top().find(key);
+  return it != top().end();
 }
 
 template <typename T, typename... Args>
