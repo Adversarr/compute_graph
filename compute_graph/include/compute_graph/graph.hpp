@@ -181,6 +181,29 @@ private:
   ToType to_;
 };
 
+template <typename From, typename To>
+class StrongLink {
+public:
+  using FromType = NodeHandle<From>;
+  using ToType = NodeHandle<To>;
+
+  template <typename AnotherFrom, typename AnotherTo>
+  CG_STRONG_INLINE StrongLink<AnotherFrom, AnotherTo> cast() const noexcept {
+    return {from_.template cast<AnotherFrom>(), to_.template cast<AnotherTo>()};
+  }
+
+  template <typename AnotherFrom, typename AnotherTo>
+  CG_STRONG_INLINE StrongLink(StrongLink<AnotherFrom, AnotherTo> const& another) noexcept:
+        StrongLink(another.template cast<AnotherFrom, AnotherTo>()) {}
+
+  CG_PP_HANDLE_COMMON(StrongLink);
+  CG_STRONG_INLINE FromType const &from() const noexcept { return from_; }
+  CG_STRONG_INLINE ToType const &to() const noexcept { return to_; }
+private:
+  FromType from_;
+  ToType to_;
+};
+
 class Graph {
 public:
   using node_ptr = std::unique_ptr<NodeBase>;
@@ -203,12 +226,25 @@ public:
   std::optional<NodeHandle<NodeType>> get(NodeType const *ptr) const noexcept;
   template <typename NodeType> void erase(NodeHandle<NodeType> handle) noexcept;
 
+  // strong link, describe node-wise connection.
+  template <typename From, typename To>
+  StrongLink<From, To> connect(NodeHandle<From> prec, NodeHandle<To> succ) noexcept;
+  template <typename From, typename To>
+  bool has_connect(NodeHandle<From> prec, NodeHandle<To> succ) noexcept;
+  template <typename From, typename To>
+  std::optional<StrongLink<From, To>> get_connect(NodeHandle<From> prec,
+                                                  NodeHandle<To> succ) noexcept;
+  template <typename From, typename To> void erase(StrongLink<From, To> link) noexcept;
+
   // socket op
   template <typename From, typename To>
   Link<From, To> connect(OutputSocketHandle<From> from, InputSocketHandle<To> to);
   template <typename From, typename To>
   bool has_connect(OutputSocketHandle<From> const &from,
                    InputSocketHandle<To> const &to) const noexcept;
+  template <typename From, typename To>
+  std::optional<Link<From, To>> get_connect(OutputSocketHandle<From> const &from,
+                                            InputSocketHandle<To> const &to) const noexcept;
   template <typename From, typename To> void erase(Link<From, To> link) noexcept;
 
   void topology_sort();
@@ -332,6 +368,40 @@ CG_STRONG_INLINE void Graph::erase(NodeHandle<NodeType> handle) noexcept {
 }
 
 template <typename From, typename To>
+CG_STRONG_INLINE StrongLink<From, To> Graph::connect(NodeHandle<From> prec,
+                                                     NodeHandle<To> succ) noexcept {
+  auto &n = prec.node();
+  if (! has_connect(prec, succ)) {
+    n.partial_succ_.push_back(&(succ.node()));
+  }
+  return {prec, succ};
+}
+
+template <typename From, typename To>
+bool Graph::has_connect(NodeHandle<From> prec, NodeHandle<To> succ) noexcept {
+  auto &n = prec.node();
+  auto &succ_node = succ.node();
+  return std::find(n.partial_succ_.begin(), n.partial_succ_.end(), &succ_node)
+         != n.partial_succ_.end();
+}
+
+template <typename From, typename To>
+std::optional<StrongLink<From, To>> Graph::get_connect(NodeHandle<From> prec,
+                                                       NodeHandle<To> succ) noexcept {
+  if (has_connect(prec, succ)) {
+    return StrongLink{prec, succ};
+  } else {
+    return std::nullopt;
+  }
+}
+
+template <typename From, typename To> void Graph::erase(StrongLink<From, To> link) noexcept {
+  auto &n = link.from().node();
+  auto &succ = link.to().node();
+  std::erase(n.partial_succ_.begin(), n.partial_succ_.end(), &succ);
+}
+
+template <typename From, typename To>
 CG_STRONG_INLINE Link<From, To> Graph::connect(OutputSocketHandle<From> from,
                                                InputSocketHandle<To> to) CG_NOEXCEPT {
   if (!can_connect(*from, *to)) {
@@ -360,6 +430,16 @@ template <typename From, typename To>
 CG_STRONG_INLINE bool Graph::has_connect(OutputSocketHandle<From> const &from,
                                          InputSocketHandle<To> const &to) const noexcept {
   return to->from() == from.operator->();
+}
+
+template <typename From, typename To>
+std::optional<Link<From, To>> Graph::get_connect(OutputSocketHandle<From> const &from,
+                                                 InputSocketHandle<To> const &to) const noexcept {
+  if (has_connect(from, to)) {
+    return Link{from, to};
+  } else {
+    return std::nullopt;
+  }
 }
 
 template <typename From, typename To>
